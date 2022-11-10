@@ -52,7 +52,31 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+
+        self.linear_layers = []
+        self.activation_layers = []
+
+        n_hidden_layers = len(n_hidden)
+
+        # Hidden Layer Modules
+        if n_hidden_layers != 0 :  # If we have hidden linear layers
+            in_features = [n_inputs,] + n_hidden[:-1] # Get the number of inputs per hidden linear layer
+            out_features = n_hidden  # Get the number of outputs per hidden linear layer
+            input_layer = [True,] + [False for i in range(0, n_hidden_layers)]  # Set True only for the first hidden linear layer
+            self.hidden_linear_layers = [LinearModule(in_features[0], out_features[0], input_layer[0]) \
+                                  for i in range(n_hidden_layers)]
+            self.hidden_activation_layers = [ELUModule for i in range(n_hidden_layers-1)] + [SoftMaxModule,]
+
+        # Final Layer Modules
+
+            in_features = n_inputs
+            out_features = n_classes
+            final_linear_layer = LinearModule()
+
+
+        self.loss = CrossEntropyModule()
+
+
         #######################
         # END OF YOUR CODE    #
         #######################

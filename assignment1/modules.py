@@ -46,6 +46,16 @@ class LinearModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        np.random.seed(14334739)
+
+        # We sample or weights using the Kaiming initialization method and a Gaussian distribution with a zero mean and
+        # a variance of 1/in_features as stated in "Tutorial 4: Optimization and Initialization"
+        self.weight = np.normal(0, np.sqrt(1/in_features), (in_features, out_features)) * np.sqrt(2 / in_features)
+
+        self.bias = np.zeros(in_features)
+
+        self.grads = {'weight': np.zeros(in_features), 'bias': np.zeros(in_features)}
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -68,6 +78,11 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        out = self.w @ x + self.b
+
+        # Cache the last output
+        self.out = out
 
         #######################
         # END OF YOUR CODE    #
@@ -93,6 +108,13 @@ class LinearModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        dx = dout @ self.w
+        dw = dout.T @ x
+        db = np.ones(1,self.out.shape[1]) @ self.out
+
+        self.grads['weights'] = dw
+        self.grad['bias'] = db
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -109,7 +131,9 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+
+        self.out = None
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -139,6 +163,13 @@ class ELUModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        # Cache the last input
+        self.x = x
+
+        # Create a function that applies elu on the whole input vector
+        elu = np.vectorize(lambda x_i: x_i if x_i > 0 else np.exp(x_i) - 1)
+        out = elu(x)
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -161,6 +192,9 @@ class ELUModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        d_elu = np.vectorize(lambda x_i: 1 if x_i > 0 else np.exp(x_i) - 1) # Derivative of ELU w.r.t. x
+        dx = dout * d_elu(self.x)
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -177,7 +211,9 @@ class ELUModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+
+        self.x = None
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -207,6 +243,13 @@ class SoftMaxModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        sum_exp_x = np.sum(np.exp(x))
+
+        out = np.exp(x) / sum_exp_x
+
+        # Cache the last output
+        self.out = out
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -229,6 +272,8 @@ class SoftMaxModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        dx = self.out * (dout - (dout * self.out) @ np.ones(self.out.shape[1], self.out.shape[1]))
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -246,7 +291,9 @@ class SoftMaxModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+
+        self.out = None
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -274,6 +321,8 @@ class CrossEntropyModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        out = np.sum(y * np.log(x)) * (- 1 / x.shape[0])
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -296,6 +345,8 @@ class CrossEntropyModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        dx = (y / x) * (- 1 / x.shape[0])
 
         #######################
         # END OF YOUR CODE    #

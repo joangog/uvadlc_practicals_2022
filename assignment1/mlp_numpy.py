@@ -53,29 +53,17 @@ class MLP(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        self.linear_layers = []
-        self.activation_layers = []
-
         n_hidden_layers = len(n_hidden)
 
-        # Hidden Layer Modules
-        if n_hidden_layers != 0 :  # If we have hidden linear layers
-            in_features = [n_inputs,] + n_hidden[:-1] # Get the number of inputs per hidden linear layer
-            out_features = n_hidden  # Get the number of outputs per hidden linear layer
-            input_layer = [True,] + [False for i in range(0, n_hidden_layers)]  # Set True only for the first hidden linear layer
-            self.hidden_linear_layers = [LinearModule(in_features[0], out_features[0], input_layer[0]) \
-                                  for i in range(n_hidden_layers)]
-            self.hidden_activation_layers = [ELUModule for i in range(n_hidden_layers-1)] + [SoftMaxModule,]
+        in_features = [n_inputs,] + n_hidden # Get the number of inputs per  linear layer
+        out_features = n_hidden + [n_classes,] # Get the number of outputs per hidden linear layer
+        input_layer = [True,] + [False for i in range(0, n_hidden_layers + 1)]  # Set True only for the first hidden linear layer
 
-        # Final Layer Modules
-
-            in_features = n_inputs
-            out_features = n_classes
-            final_linear_layer = LinearModule()
-
-
+        # Layer Modules
+        self.linear_layers = [LinearModule(in_features[0], out_features[0], input_layer[0]) \
+                              for i in range(n_hidden_layers + 1)]
+        self.activation_layers = [ELUModule for i in range(n_hidden_layers)] + [SoftMaxModule(),]
         self.loss = CrossEntropyModule()
-
 
         #######################
         # END OF YOUR CODE    #
@@ -99,6 +87,12 @@ class MLP(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        for i in range(len(self.linear_layers)):
+            x = self.linear_layers[i].forward(x)
+            x = self.activation_layers[i].forward(x)
+
+        out = x
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -119,7 +113,11 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+
+        for i in range(len(self.linear_layers), 0, -1):
+            dout = self.activation_layers[i].backward(dout)
+            dout = self.linear_layers[i].backward(dout)
+
         #######################
         # END OF YOUR CODE    #
         #######################

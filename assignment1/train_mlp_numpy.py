@@ -49,9 +49,24 @@ def confusion_matrix(predictions, targets):
     # PUT YOUR CODE HERE  #
     #######################
 
+    batch_size, n_classes = targets.shape
+
+    conf_mat = np.zeros((n_classes, n_classes))
+
+    # Convert one hot encodings into class labels (0, 1, 2, 3, etc.)
+    predictions = np.sum(predictions @ [range(0, n_classes)])
+    targets = np.sum(targets @ [range(0, n_classes)])
+
+    # Build confusion matrix
+    for i in range(batch_size):
+        pred_class = predictions[i]
+        target_class = targets[i]
+        conf_mat[pred_class, target_class] += 1
+
     #######################
     # END OF YOUR CODE    #
     #######################
+
     return conf_mat
 
 
@@ -146,7 +161,7 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
                                                   return_numpy=True)
 
     #######################
-    # PUT YOUR CODE HERE  #
+    # PUT YOUR CODE HERE  #´
     #######################
 
     # TODO: Initialize model and loss module

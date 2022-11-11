@@ -46,13 +46,13 @@ class LinearModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        np.random.seed(14334739)
+        np.random.seed(42)
 
         # We sample or weights using the Kaiming initialization method and a Gaussian distribution with a zero mean and
         # a variance of 1/in_features as stated in "Tutorial 4: Optimization and Initialization"
-        self.weight = np.normal(0, np.sqrt(1/in_features), (in_features, out_features)) * np.sqrt(2 / in_features)
+        self.weight = np.random.normal(0, np.sqrt(1/in_features), (out_features, in_features)) * np.sqrt(2 / in_features)
 
-        self.bias = np.zeros(in_features)
+        self.bias = np.zeros((1, out_features))
 
         self.grads = {'weight': np.zeros(in_features), 'bias': np.zeros(in_features)}
 
@@ -79,7 +79,14 @@ class LinearModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        out = self.w @ x + self.b
+        # Cache the last input
+        self.x = x
+
+        # Batchify bias vector
+        batch_size = x.shape[0]
+        batch_bias = np.ones((batch_size, 1)) @ self.bias  # Repeats bias vector
+
+        out = x @ self.weight.T + batch_bias
 
         # Cache the last output
         self.out = out
@@ -108,16 +115,17 @@ class LinearModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        dx = dout @ self.w
-        dw = dout.T @ x
-        db = np.ones(1,self.out.shape[1]) @ self.out
+        dx = dout @ self.weight
+        dw = dout.T @ self.x
+        db = np.ones((1, self.out.shape[0])) @ self.out
 
         self.grads['weights'] = dw
-        self.grad['bias'] = db
+        self.grads['bias'] = db
 
         #######################
         # END OF YOUR CODE    #
         #######################
+
         return dx
 
     def clear_cache(self):
@@ -132,6 +140,8 @@ class LinearModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        in_features = self.grads['weight'].shape
+        self.grads = {'weight': np.zeros(in_features), 'bias': np.zeros(in_features)}
         self.out = None
 
         #######################
@@ -166,9 +176,7 @@ class ELUModule(object):
         # Cache the last input
         self.x = x
 
-        # Create a function that applies elu on the whole input vector
-        elu = np.vectorize(lambda x_i: x_i if x_i > 0 else np.exp(x_i) - 1)
-        out = elu(x)
+        out = x * (x > 0) + (np.exp(x) - 1) * (x <= 0)
 
         #######################
         # END OF YOUR CODE    #
@@ -192,11 +200,11 @@ class ELUModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        d_elu = np.vectorize(lambda x_i: 1 if x_i > 0 else np.exp(x_i) - 1) # Derivative of ELU w.r.t. x
-        dx = dout * d_elu(self.x)
+        dx = 1 * (self.x > 0) + np.exp(self.x) * (self.x <= 0)
 
         #######################
-        # END OF YOUR CODE    #
+        # END OF YOUR CODE    #        # Create a function that applies elu on the whole input vector
+        # elu = np.vectorize(lambda x_i: x_i if x_i > 0 else np.exp(x_i) - 1)
         #######################
         return dx
 
@@ -243,9 +251,9 @@ class SoftMaxModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        sum_exp_x = np.sum(np.exp(x))
-
-        out = np.exp(x) / sum_exp_x
+        n_features = x.shape[1]
+        sum_exp_x = np.sum(np.exp(x), axis=1)
+        out = np.exp(x) / (np.ones((n_features, sum_exp_x.size)) @ sum_exp_x)
 
         # Cache the last output
         self.out = out
@@ -272,7 +280,7 @@ class SoftMaxModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        dx = self.out * (dout - (dout * self.out) @ np.ones(self.out.shape[1], self.out.shape[1]))
+        dx = self.out * (dout - (dout * self.out) @ np.ones((self.out.shape[1], self.out.shape[1])))
 
         #######################
         # END OF YOUR CODE    #

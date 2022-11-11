@@ -60,9 +60,9 @@ class MLP(object):
         input_layer = [True,] + [False for i in range(0, n_hidden_layers + 1)]  # Set True only for the first hidden linear layer
 
         # Layer Modules
-        self.linear_layers = [LinearModule(in_features[0], out_features[0], input_layer[0]) \
+        self.linear_layers = [LinearModule(in_features[i], out_features[i], input_layer[i]) \
                               for i in range(n_hidden_layers + 1)]
-        self.activation_layers = [ELUModule for i in range(n_hidden_layers)] + [SoftMaxModule(),]
+        self.activation_layers = [ELUModule() for i in range(n_hidden_layers)] + [SoftMaxModule(),]
         self.loss = CrossEntropyModule()
 
         #######################
@@ -114,7 +114,7 @@ class MLP(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        for i in range(len(self.linear_layers), 0, -1):
+        for i in range(len(self.linear_layers)-1, -1, -1):
             dout = self.activation_layers[i].backward(dout)
             dout = self.linear_layers[i].backward(dout)
 
@@ -134,7 +134,12 @@ class MLP(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+
+        for layer in self.linear_layers:
+            layer.clear_cache()
+        for layer in self.activation_layers:
+            layer.clear_cache
+
         #######################
         # END OF YOUR CODE    #
         #######################

@@ -53,9 +53,9 @@ def confusion_matrix(predictions, targets):
 
     conf_mat = np.zeros((n_classes, n_classes))
 
-    # Convert one hot encodings into class labels (0, 1, 2, 3, etc.)
-    predictions = np.sum(predictions @ [range(0, n_classes)])
-    targets = np.sum(targets @ [range(0, n_classes)])
+    # # Convert one hot encodings into class labels (0, 1, 2, 3, etc.)
+    # predictions = np.sum(predictions @ [range(0, n_classes)])
+    # targets = np.sum(targets @ [range(0, n_classes)])
 
     # Build confusion matrix
     for i in range(batch_size):
@@ -85,9 +85,22 @@ def confusion_matrix_to_metrics(confusion_matrix, beta=1.):
     # PUT YOUR CODE HERE  #
     #######################
 
+    accuracy = np.sum(np.diag(confusion_matrix)) / np.sum(confusion_matrix)
+    precision = np.diag(confusion_matrix) / (np.sum(confusion_matrix, axis=1) - np.diag(confusion_matrix))
+    recall = np.diag(confusion_matrix) / (np.sum(confusion_matrix, axis=0) - np.diag(confusion_matrix))
+    f1_beta = (1 + beta**2) * (precision * recall) / (beta**2 * precision + recall)
+
+    metrics = {
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'f1_beta': f1_beta
+    }
+
     #######################
     # END OF YOUR CODE    #
     #######################
+
     return metrics
 
 
@@ -112,9 +125,33 @@ def evaluate_model(model, data_loader, num_classes=10):
     # PUT YOUR CODE HERE  #
     #######################
 
+    num_batches = len(data_loader)
+
+    metrics = {
+        'accuracy': 0,
+        'precision': np.zeros(num_classes),
+        'recall': np.zeros(num_classes),
+        'f1_beta': np.zeros(num_classes),
+    }
+    for inputs, targets in data_loader:  # For every batch
+
+        # Convert targets to one-hot encoding
+        one_hot_targets = np.zeros((targets.size, num_classes))
+        one_hot_targets[np.arange(targets.size), targets] = 1
+
+        out = model.forward(inputs)
+
+        conf_matrix = confusion_matrix(out, one_hot_targets)
+        batch_metrics = confusion_matrix_to_metrics(conf_matrix)
+        metrics['accuracy'] += batch_metrics['accuracy'] / num_batches
+        metrics['precision'] += batch_metrics['precision'] / num_batches
+        metrics['recall'] += batch_metrics['recall'] / num_batches
+        metrics['f1_beta'] += batch_metrics['f1_beta'] / num_batches
+
     #######################
     # END OF YOUR CODE    #
     #######################
+
     return metrics
 
 
@@ -157,22 +194,83 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
 
     ## Loading the dataset
     cifar10 = cifar10_utils.get_cifar10(data_dir)
-    cifar10_loader = cifar10_utils.get_dataloader(cifar10, batch_size=batch_size,
+    cifar10_loader = cifar10_utils.get_dataloader( cifar10, batch_size=batch_size,
                                                   return_numpy=True)
 
     #######################
-    # PUT YOUR CODE HERE  #´
+    # PUT YOUR CODE HERE  #
     #######################
 
+    train_dataset = cifar10_loader['train']
+    val_dataset = cifar10_loader['validation']
+    test_dataset = cifar10_loader['test']
+
+    n_features = np.prod(train_dataset.dataset.dataset.data.shape[1:])
+    n_classes = len(train_dataset.dataset.dataset.classes)
+
     # TODO: Initialize model and loss module
-    model = ...
-    loss_module = ...
+    model = MLP(n_inputs=n_features, n_hidden=hidden_dims, n_classes=n_classes)
+    loss_module = CrossEntropyModule()
+
     # TODO: Training loop including validation
-    val_accuracies = ...
+
+    val_accuracies = []  # Validation accuracies for every epoch
+    losses = []  # Loss for every epoch
+
+    parameter_checkpoints = [{'weight': [], 'bias': []} for epoch in range(epochs)]  # stores parameter checkpoints of every epoch
+
+    # Train model
+    for epoch in range(epochs):  # For every epoch
+        epoch_losses = []  # Loss for every batch in this epoch
+
+        for inputs, targets in train_dataset:  # For every batch
+
+            # Vectorize input samples
+            n_inputs = inputs.shape[0]
+            inputs = inputs.reshape((n_inputs, n_features))
+
+            # Convert targets to one-hot encoding
+            one_hot_targets = np.zeros((targets.size, n_classes))
+            one_hot_targets[np.arange(targets.size), targets] = 1
+
+            # Forward step
+            out = model.forward(inputs)
+            loss = (loss_module.forward(out, one_hot_targets))
+            epoch_losses.append(loss)
+
+            # Backward step
+            dout = loss_module.backward(out, one_hot_targets)
+            model.backward(dout)
+
+            # Update model parameters
+            for layer in model.linear_layers:
+                layer.weight = layer.weight - lr * layer.grads['weight']
+                layer.bias = layer.bias - lr * layer.grads['bias']
+
+                # Save checkpoint
+                parameter_checkpoints[epoch]['weight'] = layer.weight
+                parameter_checkpoints[epoch]['bias'] = layer.bias
+
+            # Clear gradients and cache
+            model.clear_cache()
+
+        losses.append(np.mean(epoch_losses))  # Mean loss of epoch
+
+        # Validate model in each epoch
+        val_accuracy = evaluate_model(model, val_dataset, n_classes)
+        val_accuracies.append(val_accuracy)
+
+        # Revert model to best epoch parameters
+        best_epoch = np.argmax(val_accuracies)
+        model.weight = parameter_checkpoints[best_epoch]['weight']
+        model.bias = parameter_checkpoints[best_epoch]['bias']
+
     # TODO: Test best model
-    test_accuracy = ...
+    test_accuracy = evaluate_model(model, train_dataset, n_classes)
+
     # TODO: Add any information you might want to save for plotting
-    logging_info = ...
+    logging_dict = None
+
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -185,7 +283,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
     # Model hyperparameters
-    parser.add_argument('--hidden_dims', default=[128], type=int, nargs='+',
+    parser.add_argument('--hidden_dims', default=[64], type=int, nargs='+',
                         help='Hidden dimensionalities to use inside the network. To specify multiple, use " " to separate them. Example: "256 128"')
     
     # Optimizer hyperparameters

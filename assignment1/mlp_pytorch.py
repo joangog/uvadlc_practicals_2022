@@ -21,8 +21,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import torch
 import torch.nn as nn
-from collections import OrderedDict
+import numpy as np
 
 
 class MLP(nn.Module):
@@ -60,17 +61,39 @@ class MLP(nn.Module):
         # PUT YOUR CODE HERE  #
         #######################
 
+        super(MLP, self).__init__()
+
         n_hidden_layers = len(n_hidden)
 
-        in_features = [n_inputs,] + n_hidden # Get the number of inputs per  linear layer
-        out_features = n_hidden + [n_classes,] # Get the number of outputs per hidden linear layer
-        input_layer = [True,] + [False for i in range(0, n_hidden_layers + 1)]  # Set True only for the first hidden linear layer
+        in_features = [n_inputs,] + n_hidden # Get the number of inputs per linear layer
+        out_features = n_hidden + [n_classes,] # Get the number of outputs per linear layer
 
-        # Layer Modules
-        self.linear_layers = [nn.Linear(in_features[i], out_features[i], input_layer[i]) \
-                              for i in range(n_hidden_layers + 1)]
-        self.activation_layers = [ELUModule() for i in range(n_hidden_layers)] + [SoftMaxModule(),]
-        self.loss = CrossEntropyModule()
+        ### Layers
+        self.layers = nn.ModuleList()
+
+        ## Hidden Layers
+        for i in range(n_hidden_layers):
+            # Linear Layer
+            self.layers.append(nn.Linear(in_features[i], out_features[i]))
+            self.layers[-1].weight.data = torch.normal(0, np.sqrt(1/in_features[i]), (out_features[i], in_features[i])) * np.sqrt(2 / in_features[i])  # Initialize with Kaiming
+            # Batch Norm Layer
+            if use_batch_norm:
+                self.layers.append(nn.BatchNorm2d())
+            # Activation Layer
+            self.layers.append(nn.ELU())
+
+        ## Last Layers
+        # Linear Layer
+        self.layers.append(nn.Linear(in_features[-1], out_features[-1]))
+        torch.nn.init.kaiming_normal_(self.layers[-1].weight)  # Initialize parameters with Kaiming
+        # Batch Norm Layer
+        if use_batch_norm:
+            self.layers.append(nn.BatchNorm2d())
+        # Activation Layer
+        self.layers.append(nn.Softmax(dim=1))
+
+        ### Loss
+        self.loss = nn.CrossEntropyLoss()
 
         #######################
         # END OF YOUR CODE    #
@@ -94,7 +117,10 @@ class MLP(nn.Module):
         # PUT YOUR CODE HERE  #
         #######################
 
+        for layer in self.layers:
+            x = layer.forward(x)
 
+        out = x
 
         #######################
         # END OF YOUR CODE    #

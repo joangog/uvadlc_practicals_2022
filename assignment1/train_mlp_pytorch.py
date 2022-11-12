@@ -50,9 +50,23 @@ def confusion_matrix(predictions, targets):
     # PUT YOUR CODE HERE  #
     #######################
 
+    batch_size, n_classes = predictions.shape
+
+    conf_mat = torch.zeros((n_classes, n_classes))
+
+    # Convert class probabilities into class labels (0, 1, 2, 3, etc.)
+    predictions = torch.argmax(predictions, dim=1)
+
+    # Build confusion matrix
+    for i in range(batch_size):
+        pred_class = predictions[i]
+        target_class = targets[i]
+        conf_mat[pred_class, target_class] += 1
+
     #######################
     # END OF YOUR CODE    #
     #######################
+
     return conf_mat
 
 
@@ -71,9 +85,27 @@ def confusion_matrix_to_metrics(confusion_matrix, beta=1.):
     # PUT YOUR CODE HERE  #
     #######################
 
+    # Temporarily ignore zero division warnings. All resulting NaN values will be handled at a later stage. For
+    # instance, they will be ignored when calculating the average of a score. These zero values appear in cases where
+    # there are no samples of a class or no true positives of a class in the confusion matrix
+    with np.errstate(all='ignore'):
+
+        accuracy = torch.sum(torch.diag(confusion_matrix)) / torch.sum(confusion_matrix)
+        precision = torch.diag(confusion_matrix) / (torch.sum(confusion_matrix, axis=1))
+        recall = torch.diag(confusion_matrix) / (torch.sum(confusion_matrix, axis=0))
+        f1_beta = (1 + beta**2) * (precision * recall) / (beta**2 * precision + recall)
+
+    metrics = {
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'f1_beta': f1_beta
+    }
+
     #######################
     # END OF YOUR CODE    #
     #######################
+
     return metrics
 
 
@@ -98,9 +130,37 @@ def evaluate_model(model, data_loader, num_classes=10):
     # PUT YOUR CODE HERE  #
     #######################
 
+    num_batches = len(data_loader)
+    if type(data_loader.dataset).__name__ == 'Subset':  # For train and val dataset
+        n_features = np.prod(data_loader.dataset.dataset.data.shape[1:])
+    else:  # For test dataset
+        n_features = np.prod(data_loader.dataset.data.shape[1:])
+
+    metrics = {
+        'accuracy': 0,
+        'precision': torch.zeros(num_classes),
+        'recall': torch.zeros(num_classes),
+        'f1_beta': torch.zeros(num_classes),
+    }
+    for inputs, targets in data_loader:  # For every batch
+
+        # Vectorize input samples
+        n_inputs = inputs.shape[0]
+        inputs = inputs.reshape((n_inputs, n_features))
+
+        out = model.forward(inputs)
+
+        conf_matrix = confusion_matrix(out, targets)
+        batch_metrics = confusion_matrix_to_metrics(conf_matrix)
+        metrics['accuracy'] += batch_metrics['accuracy'] / num_batches
+        metrics['precision'] += batch_metrics['precision'] / num_batches
+        metrics['recall'] += batch_metrics['recall'] / num_batches
+        metrics['f1_beta'] += batch_metrics['f1_beta'] / num_batches
+
     #######################
     # END OF YOUR CODE    #
     #######################
+
     return metrics
 
 
@@ -158,16 +218,89 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
     # PUT YOUR CODE HERE  #
     #######################
 
-    # TODO: Initialize model and loss module
-    model = ...
-    loss_module = ...
+    train_dataset = cifar10_loader['train']
+    val_dataset = cifar10_loader['validation']
+    test_dataset = cifar10_loader['test']
+
+    n_features = np.prod(train_dataset.dataset.dataset.data.shape[1:])
+    n_classes = len(train_dataset.dataset.dataset.classes)
+
+    # TODO: Initialize model, optimizer and loss module
+    model = MLP(n_inputs=n_features, n_hidden=hidden_dims, n_classes=n_classes).to(device)
+    optimizer = optim.SGD(model.parameters(), lr=lr)
+    loss_module = model.loss.to(device)
+
+
     # TODO: Training loop including validation
-    # TODO: Do optimization with the simple SGD optimizer
-    val_accuracies = ...
+
+    val_accuracies = []  # Validation accuracies for every epoch
+    losses = []  # Loss for every epoch
+
+    model_checkpoints = []  # Stores model checkpoints of every epoch
+
+    # Train model
+    print()
+    print(f'Training for {epochs} epochs...')
+
+    for epoch in range(epochs):  # For every epoch
+        epoch_losses = []  # Loss for every batch in this epoch
+
+        for inputs, targets in train_dataset:  # For every batch
+
+            # Send data to GPU
+            inputs = inputs.to(device)
+            targets = targets.to(device)
+
+            # Vectorize input samples
+            n_inputs = inputs.shape[0]
+            inputs = inputs.reshape((n_inputs, n_features)).to(device)
+
+            # Forward step
+            out = model.forward(inputs)
+            loss = model.loss(out, targets)
+
+            # Backward step
+            loss.backward()
+
+            # Update model parameters
+            optimizer.step()
+
+            # Clear gradients
+            model.zero_grad()
+
+            # Save model checkpoint
+            model_checkpoints.append(deepcopy(model))
+            epoch_losses.append(loss.cpu().detach().numpy())
+
+        epoch_loss = np.mean(epoch_losses)  # Mean loss of epoch
+        losses.append(epoch_loss)
+
+        # Validate model in each epoch
+        val_metrics = evaluate_model(model, val_dataset, n_classes)
+        val_accuracies.append(val_metrics['accuracy'])
+        print(f'   Epoch {epoch}:')
+        print(f'      Loss: {round(epoch_loss, 2)}')
+        print(f'      Accuracy: {round(val_metrics["accuracy"], 2)}')
+
+    # Revert model to epoch with best model
+    best_epoch = torch.argmax(val_accuracies)
+    model = model_checkpoints[best_epoch]
+    print(f'Best Epoch: Epoch {best_epoch}')
+    print(f'      Loss: {round(losses[best_epoch], 2)}')
+    print(f'      Accuracy: {round(val_accuracies[best_epoch], 2)}')
+    print()
+
     # TODO: Test best model
-    test_accuracy = ...
+    print('Testing...')
+    test_metrics = evaluate_model(model, test_dataset, n_classes)
+    test_accuracy = test_metrics['accuracy']
+    print(f'   Accuracy: {round(test_accuracy, 2)}')
+
     # TODO: Add any information you might want to save for plotting
-    logging_info = ...
+    logging_info = {
+        'loss': losses
+    }
+
     #######################
     # END OF YOUR CODE    #
     #######################

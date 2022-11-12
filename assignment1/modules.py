@@ -50,11 +50,15 @@ class LinearModule(object):
 
         # We sample or weights using the Kaiming initialization method and a Gaussian distribution with a zero mean and
         # a variance of 1/in_features as stated in "Tutorial 4: Optimization and Initialization"
-        self.weight = np.random.normal(0, np.sqrt(1/in_features), (out_features, in_features)) * np.sqrt(2 / in_features)
+        self.params = {
+            'weight': np.random.normal(0, np.sqrt(1/in_features), (out_features, in_features)) * np.sqrt(2 / in_features),
+            'bias': np.zeros((1, out_features))
+        }
 
-        self.bias = np.zeros((1, out_features))
-
-        self.grads = {'weight': np.zeros(in_features), 'bias': np.zeros(in_features)}
+        self.grads = {
+            'weight': np.zeros(in_features),
+            'bias': np.zeros(in_features)
+        }
 
         #######################
         # END OF YOUR CODE    #
@@ -82,14 +86,10 @@ class LinearModule(object):
         # Cache the last input
         self.x = x
 
-        # Batchify bias vector
         batch_size = x.shape[0]
-        batch_bias = np.ones((batch_size, 1)) @ self.bias  # Repeats bias vector
+        batch_bias = np.ones((batch_size, 1)) @ self.params['bias']  # Repeats bias vector
 
-        out = x @ self.weight.T + batch_bias
-
-        # Cache the last output
-        self.out = out
+        out = x @ self.params['weight'].T + batch_bias
 
         #######################
         # END OF YOUR CODE    #
@@ -115,11 +115,11 @@ class LinearModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        dx = dout @ self.weight
+        dx = dout @ self.params['weight']
         dw = dout.T @ self.x
-        db = np.ones((1, self.out.shape[0])) @ self.out
+        db = np.ones((1, dout.shape[0])) @ dout
 
-        self.grads['weights'] = dw
+        self.grads['weight'] = dw
         self.grads['bias'] = db
 
         #######################
@@ -200,12 +200,13 @@ class ELUModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        dx = 1 * (self.x > 0) + np.exp(self.x) * (self.x <= 0)
+        # Double check if that's correct
+        dx = dout * (1 * (self.x > 0) + np.exp(self.x) * (self.x <= 0))
 
         #######################
-        # END OF YOUR CODE    #        # Create a function that applies elu on the whole input vector
-        # elu = np.vectorize(lambda x_i: x_i if x_i > 0 else np.exp(x_i) - 1)
+        # END OF YOUR CODE    #
         #######################
+
         return dx
 
     def clear_cache(self):
@@ -251,9 +252,14 @@ class SoftMaxModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        n_features = x.shape[1]
-        sum_exp_x = np.sum(np.exp(x), axis=1)
-        out = np.exp(x) / (np.ones((n_features, sum_exp_x.size)) @ sum_exp_x)
+        b = np.max(x, axis=1)
+        b = b.reshape(b.size, 1)
+
+        exp_x = np.exp(x - b)
+        sum_exp_x = np.sum(exp_x, axis=1)
+        sum_exp_x = sum_exp_x.reshape(sum_exp_x.size, 1)
+
+        out = exp_x / sum_exp_x
 
         # Cache the last output
         self.out = out
@@ -329,6 +335,11 @@ class CrossEntropyModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        # Convert labels to one-hot encoding
+        y_ = np.zeros((y.size, x.shape[1]))
+        y_[np.arange(y.size), y] = 1
+        y = y_
+
         out = np.sum(y * np.log(x)) * (- 1 / x.shape[0])
 
         #######################
@@ -353,6 +364,11 @@ class CrossEntropyModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        # Convert labels to one-hot encoding
+        y_ = np.zeros((y.size, x.shape[1]))
+        y_[np.arange(y.size), y] = 1
+        y = y_
 
         dx = (y / x) * (- 1 / x.shape[0])
 

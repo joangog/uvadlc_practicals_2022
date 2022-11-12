@@ -59,7 +59,19 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+
+        n_hidden_layers = len(n_hidden)
+
+        in_features = [n_inputs,] + n_hidden # Get the number of inputs per  linear layer
+        out_features = n_hidden + [n_classes,] # Get the number of outputs per hidden linear layer
+        input_layer = [True,] + [False for i in range(0, n_hidden_layers + 1)]  # Set True only for the first hidden linear layer
+
+        # Layer Modules
+        self.linear_layers = [nn.Linear(in_features[i], out_features[i], input_layer[i]) \
+                              for i in range(n_hidden_layers + 1)]
+        self.activation_layers = [ELUModule() for i in range(n_hidden_layers)] + [SoftMaxModule(),]
+        self.loss = CrossEntropyModule()
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -81,6 +93,8 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+
 
         #######################
         # END OF YOUR CODE    #

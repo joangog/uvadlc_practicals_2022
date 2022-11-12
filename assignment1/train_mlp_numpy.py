@@ -32,6 +32,8 @@ import cifar10_utils
 
 import torch
 
+import matplotlib.pyplot as plt
+
 
 def confusion_matrix(predictions, targets):
     """
@@ -49,13 +51,12 @@ def confusion_matrix(predictions, targets):
     # PUT YOUR CODE HERE  #
     #######################
 
-    batch_size, n_classes = targets.shape
+    batch_size, n_classes = predictions.shape
 
     conf_mat = np.zeros((n_classes, n_classes))
 
-    # # Convert one hot encodings into class labels (0, 1, 2, 3, etc.)
-    # predictions = np.sum(predictions @ [range(0, n_classes)])
-    # targets = np.sum(targets @ [range(0, n_classes)])
+    # Convert class probabilities into class labels (0, 1, 2, 3, etc.)
+    predictions = np.argmax(predictions, axis=1)
 
     # Build confusion matrix
     for i in range(batch_size):
@@ -85,10 +86,15 @@ def confusion_matrix_to_metrics(confusion_matrix, beta=1.):
     # PUT YOUR CODE HERE  #
     #######################
 
-    accuracy = np.sum(np.diag(confusion_matrix)) / np.sum(confusion_matrix)
-    precision = np.diag(confusion_matrix) / (np.sum(confusion_matrix, axis=1) - np.diag(confusion_matrix))
-    recall = np.diag(confusion_matrix) / (np.sum(confusion_matrix, axis=0) - np.diag(confusion_matrix))
-    f1_beta = (1 + beta**2) * (precision * recall) / (beta**2 * precision + recall)
+    # Temporarily ignore zero division warnings. All resulting NaN values will be handled at a later stage. For
+    # instance, they will be ignored when calculating the average of a score. These zero values appear in cases where
+    # there are no samples of a class or no true positives of a class in the confusion matrix
+    with np.errstate(all='ignore'):
+
+        accuracy = np.sum(np.diag(confusion_matrix)) / np.sum(confusion_matrix)
+        precision = np.diag(confusion_matrix) / (np.sum(confusion_matrix, axis=1))
+        recall = np.diag(confusion_matrix) / (np.sum(confusion_matrix, axis=0))
+        f1_beta = (1 + beta**2) * (precision * recall) / (beta**2 * precision + recall)
 
     metrics = {
         'accuracy': accuracy,
@@ -126,6 +132,7 @@ def evaluate_model(model, data_loader, num_classes=10):
     #######################
 
     num_batches = len(data_loader)
+    n_features = np.prod(data_loader.dataset.dataset.data.shape[1:])
 
     metrics = {
         'accuracy': 0,
@@ -135,13 +142,13 @@ def evaluate_model(model, data_loader, num_classes=10):
     }
     for inputs, targets in data_loader:  # For every batch
 
-        # Convert targets to one-hot encoding
-        one_hot_targets = np.zeros((targets.size, num_classes))
-        one_hot_targets[np.arange(targets.size), targets] = 1
+        # Vectorize input samples
+        n_inputs = inputs.shape[0]
+        inputs = inputs.reshape((n_inputs, n_features))
 
         out = model.forward(inputs)
 
-        conf_matrix = confusion_matrix(out, one_hot_targets)
+        conf_matrix = confusion_matrix(out, targets)
         batch_metrics = confusion_matrix_to_metrics(conf_matrix)
         metrics['accuracy'] += batch_metrics['accuracy'] / num_batches
         metrics['precision'] += batch_metrics['precision'] / num_batches
@@ -217,9 +224,11 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
     val_accuracies = []  # Validation accuracies for every epoch
     losses = []  # Loss for every epoch
 
-    parameter_checkpoints = [{'weight': [], 'bias': []} for epoch in range(epochs)]  # stores parameter checkpoints of every epoch
+    parameter_checkpoints = [{'weight': [], 'bias': []} for epoch in range(epochs)]  # Stores parameter checkpoints of every epoch
 
     # Train model
+    print()
+    print(f'Training for {epochs} epochs...')
     for epoch in range(epochs):  # For every epoch
         epoch_losses = []  # Loss for every batch in this epoch
 
@@ -229,47 +238,57 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
             n_inputs = inputs.shape[0]
             inputs = inputs.reshape((n_inputs, n_features))
 
-            # Convert targets to one-hot encoding
-            one_hot_targets = np.zeros((targets.size, n_classes))
-            one_hot_targets[np.arange(targets.size), targets] = 1
-
             # Forward step
             out = model.forward(inputs)
-            loss = (loss_module.forward(out, one_hot_targets))
+            loss = (loss_module.forward(out, targets))
             epoch_losses.append(loss)
 
             # Backward step
-            dout = loss_module.backward(out, one_hot_targets)
+            dout = loss_module.backward(out, targets)
             model.backward(dout)
 
             # Update model parameters
             for layer in model.linear_layers:
-                layer.weight = layer.weight - lr * layer.grads['weight']
-                layer.bias = layer.bias - lr * layer.grads['bias']
+                layer.params['weight'] = layer.params['weight'] - lr * layer.grads['weight']
+                layer.params['bias'] = layer.params['bias'] - lr * layer.grads['bias']
 
                 # Save checkpoint
-                parameter_checkpoints[epoch]['weight'] = layer.weight
-                parameter_checkpoints[epoch]['bias'] = layer.bias
+                parameter_checkpoints[epoch]['weight'] = layer.params['weight']
+                parameter_checkpoints[epoch]['bias'] = layer.params['bias']
 
             # Clear gradients and cache
             model.clear_cache()
 
-        losses.append(np.mean(epoch_losses))  # Mean loss of epoch
+        epoch_loss = np.mean(epoch_losses)  # Mean loss of epoch
+        losses.append(epoch_loss)
 
         # Validate model in each epoch
-        val_accuracy = evaluate_model(model, val_dataset, n_classes)
-        val_accuracies.append(val_accuracy)
+        val_metrics = evaluate_model(model, val_dataset, n_classes)
+        val_accuracies.append(val_metrics['accuracy'])
+        print(f'   Epoch {epoch}:')
+        print(f'      Loss: {round(epoch_loss,2)}')
+        print(f'      Accuracy: {round(val_metrics["accuracy"],2)}')
 
-        # Revert model to best epoch parameters
-        best_epoch = np.argmax(val_accuracies)
-        model.weight = parameter_checkpoints[best_epoch]['weight']
-        model.bias = parameter_checkpoints[best_epoch]['bias']
+
+    # Revert model to best epoch parameters
+    best_epoch = np.argmax(val_accuracies)
+    model.weight = parameter_checkpoints[best_epoch]['weight']
+    model.bias = parameter_checkpoints[best_epoch]['bias']
+    print(f'Best Epoch: Epoch {best_epoch}')
+    print(f'      Loss: {round(losses[best_epoch], 2)}')
+    print(f'      Accuracy: {round(val_accuracies[best_epoch], 2)}')
+    print()
 
     # TODO: Test best model
-    test_accuracy = evaluate_model(model, train_dataset, n_classes)
+    print('Testing...')
+    test_metrics = evaluate_model(model, train_dataset, n_classes)
+    test_accuracy = test_metrics['accuracy']
+    print(f'   Accuracy: {round(test_accuracy,2 )}')
 
     # TODO: Add any information you might want to save for plotting
-    logging_dict = None
+    logging_dict = {
+        'loss': losses
+    }
 
     #######################
     # END OF YOUR CODE    #
@@ -283,7 +302,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
     # Model hyperparameters
-    parser.add_argument('--hidden_dims', default=[64], type=int, nargs='+',
+    parser.add_argument('--hidden_dims', default=[128], type=int, nargs='+',
                         help='Hidden dimensionalities to use inside the network. To specify multiple, use " " to separate them. Example: "256 128"')
     
     # Optimizer hyperparameters
@@ -303,6 +322,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     kwargs = vars(args)
 
-    train(**kwargs)
+    model, val_accuracies, test_accuracy, logging_dict = train(**kwargs)
+
     # Feel free to add any additional functions, such as plotting of the loss curve here
-    
+
+    plt.title('Cross-Entropy Loss curve for NumPy MLP')
+    plt.plot(np.arange(0, args.epochs, 1), logging_dict['loss'])
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.show()

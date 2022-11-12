@@ -146,7 +146,7 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
         torch.backends.cudnn.determinstic = True
         torch.backends.cudnn.benchmark = False
 
-    # Set default device
+    # Set default device (Don't forget to send your data and layers to the device!)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Loading the dataset

@@ -75,7 +75,7 @@ class MLP(nn.Module):
         for i in range(n_hidden_layers):
             # Linear Layer
             self.layers.append(nn.Linear(in_features[i], out_features[i]))
-            self.layers[-1].weight.data = torch.normal(0, np.sqrt(1/in_features[i]), (out_features[i], in_features[i])) * np.sqrt(2 / in_features[i])  # Initialize with Kaiming
+            torch.nn.init.kaiming_normal_(self.layers[-1].weight)  # Initialize parameters with Kaiming
             # Batch Norm Layer
             if use_batch_norm:
                 self.layers.append(nn.BatchNorm2d())
@@ -116,6 +116,10 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        # Patch for fixing a random bug where the input is sometimes in a different device than the model
+        if x.device.type != self.device.type:
+            x = x.detach().to(self.device)
 
         for layer in self.layers:
             x = layer.forward(x)

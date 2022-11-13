@@ -33,6 +33,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+import matplotlib.pyplot as plt
+
 
 def confusion_matrix(predictions, targets):
     """
@@ -246,14 +248,13 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
         epoch_losses = []  # Loss for every batch in this epoch
 
         for inputs, targets in train_dataset:  # For every batch
-
             # Send data to GPU
             inputs = inputs.to(device)
             targets = targets.to(device)
 
             # Vectorize input samples
             n_inputs = inputs.shape[0]
-            inputs = inputs.reshape((n_inputs, n_features)).to(device)
+            inputs = inputs.reshape((n_inputs, n_features))
 
             # Forward step
             out = model.forward(inputs)
@@ -269,22 +270,22 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
             model.zero_grad()
 
             # Save model checkpoint
-            model_checkpoints.append(deepcopy(model))
-            epoch_losses.append(loss.cpu().detach().numpy())
+            model_checkpoints.append(model.state_dict())
+            epoch_losses.append(loss.cpu().detach().item())
 
         epoch_loss = np.mean(epoch_losses)  # Mean loss of epoch
         losses.append(epoch_loss)
 
         # Validate model in each epoch
         val_metrics = evaluate_model(model, val_dataset, n_classes)
-        val_accuracies.append(val_metrics['accuracy'])
+        val_accuracies.append(val_metrics['accuracy'].item())
         print(f'   Epoch {epoch}:')
         print(f'      Loss: {round(epoch_loss, 2)}')
-        print(f'      Accuracy: {round(val_metrics["accuracy"], 2)}')
+        print(f'      Accuracy: {round(val_accuracies[-1], 2)}')
 
     # Revert model to epoch with best model
-    best_epoch = torch.argmax(val_accuracies)
-    model = model_checkpoints[best_epoch]
+    best_epoch = np.argmax(val_accuracies)
+    model.load_state_dict(model_checkpoints[best_epoch])
     print(f'Best Epoch: Epoch {best_epoch}')
     print(f'      Loss: {round(losses[best_epoch], 2)}')
     print(f'      Accuracy: {round(val_accuracies[best_epoch], 2)}')
@@ -293,7 +294,7 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
     # TODO: Test best model
     print('Testing...')
     test_metrics = evaluate_model(model, test_dataset, n_classes)
-    test_accuracy = test_metrics['accuracy']
+    test_accuracy = test_metrics['accuracy'].item()
     print(f'   Accuracy: {round(test_accuracy, 2)}')
 
     # TODO: Add any information you might want to save for plotting
@@ -335,6 +336,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
     kwargs = vars(args)
 
-    train(**kwargs)
+    model, val_accuracies, test_accuracy, logging_info = train(**kwargs)
+
     # Feel free to add any additional functions, such as plotting of the loss curve here
+
+    plt.title('Cross-Entropy Loss curve for PyTorch MLP')
+    plt.plot(np.arange(0, args.epochs, 1), logging_info['loss'])
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.show()
     

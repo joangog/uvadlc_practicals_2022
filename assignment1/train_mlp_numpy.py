@@ -132,7 +132,10 @@ def evaluate_model(model, data_loader, num_classes=10):
     #######################
 
     num_batches = len(data_loader)
-    n_features = np.prod(data_loader.dataset.dataset.data.shape[1:])
+    if type(data_loader.dataset).__name__ == 'Subset':  # For train and val dataset
+        n_features = np.prod(data_loader.dataset.dataset.data.shape[1:])
+    else:  # For test dataset
+        n_features = np.prod(data_loader.dataset.data.shape[1:])
 
     metrics = {
         'accuracy': 0,
@@ -217,7 +220,7 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
 
     # TODO: Initialize model and loss module
     model = MLP(n_inputs=n_features, n_hidden=hidden_dims, n_classes=n_classes)
-    loss_module = CrossEntropyModule()
+    loss_module = model.loss
 
     # TODO: Training loop including validation
 
@@ -276,17 +279,17 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
     model.bias = parameter_checkpoints[best_epoch]['bias']
     print(f'Best Epoch: Epoch {best_epoch}')
     print(f'      Loss: {round(losses[best_epoch], 2)}')
-    print(f'      Accuracy: {round(val_accuracies[best_epoch], 2)}')
+    print(f'      Accuracmy: {round(val_accuracies[best_epoch], 2)}')
     print()
 
     # TODO: Test best model
     print('Testing...')
-    test_metrics = evaluate_model(model, train_dataset, n_classes)
+    test_metrics = evaluate_model(model, test_dataset, n_classes)
     test_accuracy = test_metrics['accuracy']
     print(f'   Accuracy: {round(test_accuracy,2 )}')
 
     # TODO: Add any information you might want to save for plotting
-    logging_dict = {
+    logging_info = {
         'loss': losses
     }
 
@@ -294,7 +297,7 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
     # END OF YOUR CODE    #
     #######################
 
-    return model, val_accuracies, test_accuracy, logging_dict
+    return model, val_accuracies, test_accuracy, logging_info
 
 
 if __name__ == '__main__':
@@ -322,12 +325,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     kwargs = vars(args)
 
-    model, val_accuracies, test_accuracy, logging_dict = train(**kwargs)
+    model, val_accuracies, test_accuracy, logging_info = train(**kwargs)
 
     # Feel free to add any additional functions, such as plotting of the loss curve here
 
     plt.title('Cross-Entropy Loss curve for NumPy MLP')
-    plt.plot(np.arange(0, args.epochs, 1), logging_dict['loss'])
+    plt.plot(np.arange(0, args.epochs, 1), logging_info['loss'])
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.show()

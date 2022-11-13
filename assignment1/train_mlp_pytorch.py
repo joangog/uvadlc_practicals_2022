@@ -87,15 +87,10 @@ def confusion_matrix_to_metrics(confusion_matrix, beta=1.):
     # PUT YOUR CODE HERE  #
     #######################
 
-    # Temporarily ignore zero division warnings. All resulting NaN values will be handled at a later stage. For
-    # instance, they will be ignored when calculating the average of a score. These zero values appear in cases where
-    # there are no samples of a class or no true positives of a class in the confusion matrix
-    with np.errstate(all='ignore'):
-
-        accuracy = torch.sum(torch.diag(confusion_matrix)) / torch.sum(confusion_matrix)
-        precision = torch.diag(confusion_matrix) / (torch.sum(confusion_matrix, axis=1))
-        recall = torch.diag(confusion_matrix) / (torch.sum(confusion_matrix, axis=0))
-        f1_beta = (1 + beta**2) * (precision * recall) / (beta**2 * precision + recall)
+    accuracy = torch.sum(torch.diag(confusion_matrix)) / torch.sum(confusion_matrix)
+    precision = torch.diag(confusion_matrix) / (torch.sum(confusion_matrix, axis=1))
+    recall = torch.diag(confusion_matrix) / (torch.sum(confusion_matrix, axis=0))
+    f1_beta = (1 + beta**2) * (precision * recall) / (beta**2 * precision + recall)
 
     metrics = {
         'accuracy': accuracy,
@@ -132,18 +127,15 @@ def evaluate_model(model, data_loader, num_classes=10):
     # PUT YOUR CODE HERE  #
     #######################
 
-    num_batches = len(data_loader)
     if type(data_loader.dataset).__name__ == 'Subset':  # For train and val dataset
         n_features = np.prod(data_loader.dataset.dataset.data.shape[1:])
+        n_classes = len(data_loader.dataset.dataset.classes)
     else:  # For test dataset
         n_features = np.prod(data_loader.dataset.data.shape[1:])
+        n_classes = len(data_loader.dataset.classes)
 
-    metrics = {
-        'accuracy': 0,
-        'precision': torch.zeros(num_classes),
-        'recall': torch.zeros(num_classes),
-        'f1_beta': torch.zeros(num_classes),
-    }
+    conf_matrix = torch.zeros((n_classes, n_classes))
+
     for inputs, targets in data_loader:  # For every batch
 
         # Vectorize input samples
@@ -152,12 +144,10 @@ def evaluate_model(model, data_loader, num_classes=10):
 
         out = model.forward(inputs)
 
-        conf_matrix = confusion_matrix(out, targets)
-        batch_metrics = confusion_matrix_to_metrics(conf_matrix)
-        metrics['accuracy'] += batch_metrics['accuracy'] / num_batches
-        metrics['precision'] += batch_metrics['precision'] / num_batches
-        metrics['recall'] += batch_metrics['recall'] / num_batches
-        metrics['f1_beta'] += batch_metrics['f1_beta'] / num_batches
+        conf_matrix += confusion_matrix(out, targets)
+
+    metrics = confusion_matrix_to_metrics(conf_matrix)
+    metrics['conf_matrix'] = conf_matrix
 
     #######################
     # END OF YOUR CODE    #
@@ -299,7 +289,9 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
 
     # TODO: Add any information you might want to save for plotting
     logging_info = {
-        'loss': losses
+        'loss': losses,
+        'conf_matrix': test_metrics['conf_matrix'],
+        'f1_beta': test_metrics['f1_beta']
     }
 
     #######################
@@ -339,6 +331,10 @@ if __name__ == '__main__':
     model, val_accuracies, test_accuracy, logging_info = train(**kwargs)
 
     # Feel free to add any additional functions, such as plotting of the loss curve here
+
+    # To see the values of these I used the PyCharm debugger
+    conf_matrix = logging_info['conf_matrix'].numpy().astype(int)
+    f1_beta = logging_info['f1_beta'].numpy()
 
     plt.title('Cross-Entropy Loss curve for PyTorch MLP')
     plt.plot(np.arange(0, args.epochs, 1), logging_info['loss'])

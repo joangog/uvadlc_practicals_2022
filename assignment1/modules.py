@@ -46,8 +46,6 @@ class LinearModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        np.random.seed(42)
-
         # We sample or weights using the Kaiming initialization method and a Gaussian distribution with a zero mean and
         # a variance of 1/in_features as stated in "Tutorial 4: Optimization and Initialization"
         self.params = {

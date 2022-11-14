@@ -212,7 +212,7 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
     model = MLP(n_inputs=n_features, n_hidden=hidden_dims, n_classes=n_classes)
     loss_module = model.loss
 
-    # TODO: Tra        np.random.seed(42)ining loop including validation
+    # TODO: Training loop including validation
 
     val_accuracies = []  # Validation accuracies for every epoch
     losses = []  # Loss for every epoch
@@ -245,13 +245,15 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
                 layer.params['weight'] = layer.params['weight'] - lr * layer.grads['weight']
                 layer.params['bias'] = layer.params['bias'] - lr * layer.grads['bias']
 
-                # Save checkpoint
-                parameter_checkpoints[epoch]['weight'] = layer.params['weight']
-                parameter_checkpoints[epoch]['bias'] = layer.params['bias']
-
             # Clear gradients and cache
             model.clear_cache()
 
+        # Save checkpoint
+        for layer in model.linear_layers:
+            parameter_checkpoints[epoch]['weight'].append(layer.params['weight'])
+            parameter_checkpoints[epoch]['bias'].append(layer.params['bias'])
+
+        # Save epoch loss
         epoch_loss = np.mean(epoch_losses)  # Mean loss of epoch
         losses.append(epoch_loss)
 
@@ -265,8 +267,9 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
 
     # Revert model to best epoch parameters
     best_epoch = np.argmax(val_accuracies)
-    model.weight = parameter_checkpoints[best_epoch]['weight']
-    model.bias = parameter_checkpoints[best_epoch]['bias']
+    for i, layer in enumerate(model.linear_layers):
+        layer.params['weight'] = parameter_checkpoints[best_epoch]['weight'][i]
+        layer.params['bias'] = parameter_checkpoints[best_epoch]['bias'][i]
     print(f'Best Epoch: Epoch {best_epoch}')
     print(f'      Loss: {round(losses[best_epoch], 2)}')
     print(f'      Accuracy: {round(val_accuracies[best_epoch], 2)}')

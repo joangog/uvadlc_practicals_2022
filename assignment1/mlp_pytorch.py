@@ -78,7 +78,7 @@ class MLP(nn.Module):
             torch.nn.init.kaiming_normal_(self.layers[-1].weight)  # Initialize parameters with Kaiming
             # Batch Norm Layer
             if use_batch_norm:
-                self.layers.append(nn.BatchNorm2d())
+                self.layers.append(nn.BatchNorm1d(out_features[i]))
             # Activation Layer
             self.layers.append(nn.ELU())
 
@@ -88,7 +88,7 @@ class MLP(nn.Module):
         torch.nn.init.kaiming_normal_(self.layers[-1].weight)  # Initialize parameters with Kaiming
         # Batch Norm Layer
         if use_batch_norm:
-            self.layers.append(nn.BatchNorm2d())
+            self.layers.append(nn.BatchNorm1d(out_features[-1]))
         # Activation Layer
         self.layers.append(nn.Softmax(dim=1))
 

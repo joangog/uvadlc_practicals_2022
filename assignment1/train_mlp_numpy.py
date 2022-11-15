@@ -283,7 +283,7 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
 
     # TODO: Add any information you might want to save for plotting
     logging_info = {
-        'loss': losses
+        'losses': losses
     }
 
     #######################
@@ -323,7 +323,7 @@ if __name__ == '__main__':
     # Feel free to add any additional functions, such as plotting of the loss curve here
 
     plt.title('Cross-Entropy Loss curve for NumPy MLP')
-    plt.plot(np.arange(0, args.epochs, 1), logging_info['loss'])
+    plt.plot(np.arange(0, args.epochs, 1), logging_info['losses'])
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.show()

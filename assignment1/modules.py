@@ -138,8 +138,8 @@ class LinearModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
-        in_features = self.grads['weight'].shape
-        self.grads = {'weight': np.zeros(in_features), 'bias': np.zeros(in_features)}
+        (in_features, out_features) = self.grads['weight'].shape
+        self.grads = {'weight': np.zeros((in_features, out_features)), 'bias': np.zeros(out_features)}
         self.out = None
 
         #######################

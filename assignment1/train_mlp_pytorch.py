@@ -321,8 +321,8 @@ if __name__ == '__main__':
                         help='Use this option to add Batch Normalization layers to the MLP.')
     
     # Optimizer hyperparameters
-    parser.add_argument('--lr', default=[0.1], type=float, nargs='+',
-                        help='Learning rate to use. To specify multiple, use " " to separate them.')
+    parser.add_argument('--lr', default=0.1, type=float,
+                        help='Learning rate to use.')
     parser.add_argument('--batch_size', default=128, type=int,
                         help='Minibatch size')
 
@@ -337,70 +337,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
     kwargs = vars(args)
 
+    model, val_accuracies, test_accuracy, logging_info = train(**kwargs)
+
     # Feel free to add any additional functions, such as plotting of the loss curve here
-
-    # Make an array for each result type in case train() will be run multiple times using different arguments
-    model_list = []
-    train_accuracies_list = []
-    val_accuracies_list = []
-    test_accuracy_list = []
-    losses_list = []
-
-    # lr settings
-    lr_list = kwargs['lr']
-    # lr_list = 10 ** np.linspace(-6, 2, 9)  # Uncomment this line for Question 2.4.iii (We did it manually because writing every value as an argument wasn't efficient)
-
-    # For every lr setting
-    for lr in lr_list:
-        kwargs['lr'] = lr
-
-        # Train Model
-        model, val_accuracies, test_accuracy, logging_info = train(**kwargs)
-
-        # Save model results
-        model_list.append(model)
-        train_accuracies_list.append(logging_info['train_accuracies'])
-        val_accuracies_list.append(val_accuracies)
-        test_accuracy_list.append(test_accuracy)
-        losses_list.append(logging_info['losses'])
 
     # Test Confusion Matrix and F1-scores for each class (for Question 2.3.ii)
     # Note 1: To see the values of the two variables below we used the PyCharm debugger:
-    # Note 2: We just use the "logging_info" var because the results below are needed for a Question where we don't execute train() multiple
-    # times for different settings, but only once.
     conf_matrix = logging_info['conf_matrix'].numpy().astype(int)
     f1_beta = logging_info['f1_beta'].numpy()
 
-    # Loss plot
-    plt.figure()
     plt.title('Cross-Entropy Loss curve for PyTorch MLP')
-    plt.plot(np.arange(0, args.epochs, 1), np.array(losses_list).T)
-    if len(lr_list) != 1:  # If we run train() with multiple lr settings
-        plt.legend([f'lr = {lr}' for lr in lr_list])
+    plt.plot(logging_info['losses'])
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
 
-    # Training/Validation Accuracy plot
-    if len(lr_list) == 1:  # Only plot this if we don't have multiple lr to test (for Question 2.5.vi)
-        plt.figure()
-        plt.title(f'Training Accuracy curve with hidden_dims = {kwargs["hidden_dims"]}')
-        plt.plot(np.arange(0, args.epochs, 1), np.array(train_accuracies_list).T)
-        plt.xlabel('Epochs')
-        plt.ylabel('Accuracy')
-        plt.figure()
-        plt.title(f'Validation Accuracy curve with hidden_dims = {kwargs["hidden_dims"]}')
-        plt.plot(np.arange(0, args.epochs, 1), np.array(val_accuracies_list).T)
-        plt.xlabel('Epochs')
-        plt.ylabel('Accuracy')
-
-    # Validation Accuracy per Learning Rate plot
-    if len(lr_list) != 1:  # Only plot this if we have multiple lr to test (for Question 2.4.iii)
-        plt.figure()
-        plt.title('Validation Accuracy for different learning rates')
-        plt.xscale('log')
-        plt.plot(lr_list, [np.max(val_accuracies) for val_accuracies in val_accuracies_list])
-        plt.xlabel('Learning Rate')
-        plt.ylabel('Accuracy')
-
     plt.show()
-    

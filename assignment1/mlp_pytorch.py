@@ -89,8 +89,6 @@ class MLP(nn.Module):
         # Batch Norm Layer
         if use_batch_norm:
             self.layers.append(nn.BatchNorm1d(out_features[-1]))
-        # Activation Layer
-        self.layers.append(nn.Softmax(dim=1))
 
         ### Loss
         self.loss = nn.CrossEntropyLoss()

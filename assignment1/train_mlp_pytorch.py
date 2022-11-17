@@ -220,8 +220,6 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
     # TODO: Initialize model, optimizer and loss module
     model = MLP(n_inputs=n_features, n_hidden=hidden_dims, n_classes=n_classes, use_batch_norm=use_batch_norm).to(device)
     optimizer = optim.SGD(model.parameters(), lr=lr)
-    loss_module = model.loss.to(device)
-
 
     # TODO: Training loop including validation
 

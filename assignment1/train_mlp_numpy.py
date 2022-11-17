@@ -322,8 +322,16 @@ if __name__ == '__main__':
 
     # Feel free to add any additional functions, such as plotting of the loss curve here
 
+    plt.figure()
     plt.title('Cross-Entropy Loss curve for NumPy MLP')
     plt.plot(np.arange(0, args.epochs, 1), logging_info['losses'])
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.show()
+
+    plt.figure()
+    plt.title('Validation Accuracy curve for NumPy MLP')
+    plt.plot(val_accuracies)
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.show()

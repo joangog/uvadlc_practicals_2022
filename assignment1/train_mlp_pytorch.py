@@ -346,8 +346,15 @@ if __name__ == '__main__':
     conf_matrix = logging_info['conf_matrix'].numpy().astype(int)
     f1_beta = logging_info['f1_beta'].numpy()
 
+    plt.figure()
     plt.title('Cross-Entropy Loss curve for PyTorch MLP')
     plt.plot(logging_info['losses'])
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+
+    plt.figure()
+    plt.title('Validation Accuracy curve for PyTorch MLP')
+    plt.plot(val_accuracies)
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
 

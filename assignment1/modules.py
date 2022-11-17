@@ -49,7 +49,7 @@ class LinearModule(object):
         # We sample or weights using the Kaiming initialization method and a Gaussian distribution with a zero mean and
         # a variance of 1/in_features as stated in "Tutorial 4: Optimization and Initialization"
         self.params = {
-            'weight': np.random.normal(0, np.sqrt(1/in_features), (out_features, in_features)) * np.sqrt(2 / in_features),
+            'weight': np.random.normal(0, np.sqrt(2/in_features), (out_features, in_features)),
             'bias': np.zeros((1, out_features))
         }
 

@@ -169,7 +169,7 @@ def plot_results(results_filename):
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
         plt.figure()
-        plt.title(f'Validation Accuracy curve with hidden_dims = {kwargs["hidden_dimplt.figure()s"]}')
+        plt.title(f'Validation Accuracy curve with hidden_dims = {kwargs["hidden_dims"]}')
         plt.plot(np.array(results['2_5']['val_accuracies_list'][i]).T)
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')

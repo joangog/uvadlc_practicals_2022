@@ -279,7 +279,7 @@ def main(lr, batch_size, epochs, data_dir, seed, augmentation_name):
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=2)
     accuracy = evaluate_model(model, test_loader, device)
 
-    print(f'   Accuracy: {round(accuracy * 100, 2)}%')
+    print(f'      - Accuracy: {round(accuracy * 100, 2)}%')
     print()
 
     end = time.process_time()

@@ -174,11 +174,11 @@ class ZeroshotCLIP(nn.Module):
         text = clip.tokenize(prompts).to(device)
 
         # Compute the text features (encodings) for each prompt
-        with torch.no_grad:
+        with torch.no_grad():
             text_features = clip_model.encode_text(text)
 
         # Normalize the text features
-        text_features /= text_features.norm(dim=-1, keepdim=True)
+        text_features /= text_features.norm(dim=0)
 
         # Return a tensor of shape (num_prompts, 512)
         return text_features
@@ -220,16 +220,17 @@ class ZeroshotCLIP(nn.Module):
         #   https://github.com/openai/CLIP#api
 
         # Compute the image features (encodings) using the CLIP model
-        image_features = self.clip_model(image)
+        with torch.no_grad():
+            image_features = self.clip_model.encode_image(image)
 
         # Normalize the image features
         image_features /= image_features.norm(dim=-1, keepdim=True)
 
         # Compute similarity logits between the image features and the text features
-        similarity = (self.clip_model.logit_scale * image_features @ self.text_features.T).softmax(dim=-1)
+        similarity = (self.clip_model.logit_scale * image_features @ self.text_features.T)
 
         # Return logits of shape (num_classes,)
-        return image_features
+        return similarity
 
         #######################
         # END OF YOUR CODE    #
@@ -390,13 +391,16 @@ def main():
     # - Updating the accuracy meter is as simple as calling top1.update(accuracy, batch_size)
     # - You can use the model_inference method of the ZeroshotCLIP class to get the logits
 
-    for inputs, targets in loader:
-        out = clipzs(inputs)
-        accuracy = sum(out == targets).detach().cpu().item()
-        top1.update(accuracy, input.shape[0])
+    for inputs, targets in tqdm(loader):
 
+        # Send data to GPU
+        inputs = inputs.to(device)
+        targets = targets.to(device)
 
+        out = clipzs.model_inference(inputs).topk(1, dim=1)[1].squeeze()  # Top-1 output labels
 
+        accuracy = (sum(out == targets) / len(targets)).detach().cpu().item()
+        top1.update(accuracy, inputs.shape[0])
 
     #######################
     # END OF YOUR CODE    #

@@ -60,14 +60,22 @@ class Learner:
             self.resume_checkpoint()
 
         print("Turning off gradients in both the image and the text encoder")
+
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
         # TODO: Turn off gradients in both the image and the text encoder
         # Note: You need to keep the visual prompt's parameters trainable
         # Hint: Check for "prompt_learner" in the parameters' names
 
-        raise NotImplementedError
+        for name, param in self.vpt.named_parameters():
+            print(name)
+            if 'prompt_learner' not in name:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -220,7 +228,25 @@ class Learner:
             # - Perform a backward pass
             # - Update the parameters
 
-            raise NotImplementedError
+            # Set the gradients to zero
+            self.optimizer.zero_grad()
+
+            # Move the images/targets to the device
+            images = images.to(self.device)
+            target = target.to(self.device)
+
+            # Perform a forward pass (using self.vpt)
+            output = self.vpt(images)
+
+            # Compute the loss (using self.criterion)
+            loss = self.criterion(output, target)
+
+            # Perform a backward pass
+            loss.backward()
+
+            # Update the parameters
+            self.optimizer.step()
+
             #######################
             # END OF YOUR CODE    #
             #######################
@@ -285,7 +311,15 @@ class Learner:
                 # - Forward pass (using self.vpt)
                 # - Compute the loss (using self.criterion)
 
-                raise NotImplementedError
+                self.optimizer.zero_grad()
+
+                images = images.to(self.device)
+                target = target.to(self.device)
+
+                output = self.vpt(images)
+
+                loss = self.criterion(output, target)
+
                 #######################
                 # END OF YOUR CODE    #
                 #######################

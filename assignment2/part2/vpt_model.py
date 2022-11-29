@@ -84,8 +84,15 @@ class CustomCLIP(nn.Module):
         # - Given a list of prompts, compute the text features for each prompt.
         # - Return a tensor of shape (num_prompts, 512).
 
-        # remove this line once you implement the function
-        raise NotImplementedError("Write the code to compute text features.")
+        # Tokenize each text prompt using CLIP's tokenizer
+        text = clip.tokenize(prompts).to(args.device)
+
+        # Compute the text features (encodings) for each prompt
+        with torch.no_grad():
+            text_features = clip_model.encode_text(text)
+
+        # Normalize the text features
+        text_features = text_features / text_features.norm(dim=0)
 
         #######################
         # END OF YOUR CODE    #
@@ -119,8 +126,20 @@ class CustomCLIP(nn.Module):
         # - You need to multiply the similarity logits with the logit scale (clip_model.logit_scale).
         # - Return logits of shape (num_classes,).
 
-        # remove this line once you implement the function
-        raise NotImplementedError("Implement the model_inference function.")
+        # Add the prompt to the image using self.prompt_learner
+        image = self.prompt_learner.forward(image)
+
+        # Compute the image features (encodings) using the CLIP model
+        image_features = self.clip_model.encode_image(image)
+
+        # Normalize the image features
+        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+
+        # Compute similarity logits between the image features and the text features
+        similarity = self.clip_model.logit_scale * image_features @ self.text_features.T
+
+        # Return logits of shape (num_classes,)
+        return similarity
 
         #######################
         # END OF YOUR CODE    #

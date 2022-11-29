@@ -15,6 +15,8 @@
 ################################################################################
 
 """Defines various kinds of visual-prompting modules for images."""
+import random
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -42,7 +44,14 @@ class PadPrompter(nn.Module):
         # - Shape of self.pad_up and self.pad_down should be (1, 3, pad_size, image_size)
         # - See Fig 2.(g)/(h) and think about the shape of self.pad_left and self.pad_right
 
-        raise NotImplementedError
+        self.pad_size = pad_size
+        self.image_size = image_size
+
+        self.pad_left = nn.Parameter(torch.randn((1, 3, image_size - 2 * pad_size, pad_size)))
+        self.pad_right = nn.Parameter(torch.randn((1, 3, image_size - 2 * pad_size, pad_size)))
+        self.pad_up = nn.Parameter(torch.randn((1, 3, pad_size, image_size)))
+        self.pad_down = nn.Parameter(torch.randn((1, 3, pad_size, image_size)))
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -58,7 +67,15 @@ class PadPrompter(nn.Module):
         # - It is always advisable to implement and then visualize if
         #   your prompter does what you expect it to do.
 
-        raise NotImplementedError
+        batch_size = x.shape[0]
+
+        x[:, :, self.pad_size:self.image_size-self.pad_size,:self.pad_size] = self.pad_left.repeat(batch_size, 1, 1, 1) # Repeats the padding for every image in the batch
+        x[:, :, self.pad_size:self.image_size-self.pad_size, self.image_size-self.pad_size:self.image_size] = self.pad_right.repeat(batch_size, 1, 1, 1)
+        x[:, :, :self.pad_size, :self.image_size] = self.pad_up.repeat(batch_size, 1, 1, 1)
+        x[:, :, self.image_size-self.pad_size:self.image_size, :self.image_size] = self.pad_down.repeat(batch_size, 1, 1, 1)
+
+        return x
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -89,7 +106,11 @@ class FixedPatchPrompter(nn.Module):
         # - You can define variable parameters using torch.nn.Parameter
         # - You can initialize the patch randomly in N(0, 1) using torch.randn
 
-        raise NotImplementedError
+        self.prompt_size = args.prompt_size
+        self.image_size = args.image_size
+
+        self.patch = nn.Parameter(torch.randn((1, 3, self.prompt_size, self.prompt_size)))
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -105,7 +126,12 @@ class FixedPatchPrompter(nn.Module):
         # - It is always advisable to implement and then visualize if
         #   your prompter does what you expect it to do.
 
-        raise NotImplementedError
+        batch_size = x.shape[0]
+
+        x[:, 3.:self.prompt_size, :self.prompt_size] = self.patch.repeat(batch_size, 1, 1, 1)
+
+        return x
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -136,7 +162,11 @@ class RandomPatchPrompter(nn.Module):
         # - You can define variable parameters using torch.nn.Parameter
         # - You can initialize the patch randomly in N(0, 1) using torch.randn
 
-        raise NotImplementedError
+        self.prompt_size = args.prompt_size
+        self.image_size = args.image_size
+
+        self.patch = nn.Parameter(torch.randn((1, 3, self.prompt_size, self.prompt_size)))
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -150,11 +180,20 @@ class RandomPatchPrompter(nn.Module):
         # Hints:
         # - First define the prompt. Then add it to the batch of images.
         # - Note that, here, you need to place the patch at a random location
-        #   and not at the top-left corner.
+        #   and not in the top-left corner.
         # - It is always advisable to implement and then visualize if
         #   your prompter does what you expect it to do.
 
-        raise NotImplementedError
+        batch_size = x.shape[0]
+
+        # Generate random indices for patch position
+        i = random.randint(0, self.image_size - self.prompt_size)
+        j = random.randint(0, self.image_size - self.prompt_size)
+
+        x[:, :, i:i+self.prompt_size, j:j+self.prompt_size] = self.patch.repeat(batch_size, 1, 1, 1)
+
+        return x
+
         #######################
         # END OF YOUR CODE    #
         #######################

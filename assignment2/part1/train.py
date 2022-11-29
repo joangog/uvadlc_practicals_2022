@@ -27,7 +27,7 @@ import torchvision.models as models
 # My imports
 from tqdm.auto import tqdm  # For progress bar
 
-from cifar100_utils import get_train_validation_set, get_test_set
+from cifar100_utils import get_train_validation_set, get_test_set, add_augmentation
 
 
 def set_seed(seed):
@@ -52,12 +52,13 @@ def get_model(num_classes=100):
     Returns:
         model: nn.Module object representing the model architecture.
     """
+
     #######################
     # PUT YOUR CODE HERE  #
     #######################
 
     # Get the pretrained ResNet18 model on ImageNet from torchvision.models
-    model = models.resnet.resnet18()
+    model = models.resnet.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
 
     # Randomly initialize and modify the model's last layer for CIFAR100.
     model_params = [param for param in model.parameters()]
@@ -135,7 +136,14 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
         print(f'Epoch {epoch}:')
         epoch_losses = []  # Loss for every batch in this epoch
 
-        for inputs, targets in tqdm(train_loader, colour='white'):  # For every batch
+        for inputs, targets in tqdm(train_loader):  # For every batch
+
+            # Apply augmentation
+            transform_list = []
+            if augmentation_name:
+                transform_list = add_augmentation(augmentation_name, transform_list)
+                inputs = transform_list(inputs)
+
             # Send data to GPU
             inputs = inputs.to(device)
             targets = targets.to(device)
@@ -224,9 +232,9 @@ def evaluate_model(model, data_loader, device):
             out = model.forward(inputs)
             out = torch.argmax(out, axis=1)  # Convert from probabilities to 1-hot
 
-        accuracy_list.append(sum(out == targets).detach().cpu().item())
+        accuracy_list.append((sum(out == targets) / len(targets)).detach().cpu().item())
 
-    accuracy = np.mean(accuracy_list) / len(accuracy_list)
+    accuracy = np.mean(accuracy_list)
 
     #######################
     # END OF YOUR CODE    #
@@ -266,7 +274,7 @@ def main(lr, batch_size, epochs, data_dir, seed, augmentation_name):
     pass
 
     # Train the model
-    model = train_model(model, lr, batch_size, epochs, data_dir, 'best_model', device, augmentation_name)
+    model = train_model(model, lr, batch_size, epochs, data_dir, f'best_model_{time.time()}', device, augmentation_name)
 
 
     # Evaluate the model on the test set

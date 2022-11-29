@@ -34,10 +34,14 @@ def add_augmentation(augmentation_name, transform_list):
     #######################
 
     # Create a new transformation based on the augmentation_name.
-    pass
+    new_transform = getattr(transforms, augmentation_name)()
 
     # Add the new transformation to the list.
-    pass
+    transform_list.append(new_transform)
+
+    transform_list = transforms.Compose(transform_list)
+
+    return transform_list
 
     #######################
     # END OF YOUR CODE    #

@@ -128,7 +128,7 @@ class FixedPatchPrompter(nn.Module):
 
         batch_size = x.shape[0]
 
-        x[:, 3.:self.prompt_size, :self.prompt_size] = self.patch.repeat(batch_size, 1, 1, 1)
+        x[:, :, :self.prompt_size, :self.prompt_size] = self.patch.repeat(batch_size, 1, 1, 1)
 
         return x
 

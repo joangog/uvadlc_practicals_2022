@@ -23,12 +23,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data
 import torchvision.models as models
+from torchvision.transforms import Compose
 
 # My imports
 from tqdm.auto import tqdm  # For progress bar
 
 from cifar100_utils import get_train_validation_set, get_test_set, add_augmentation
-
+from dataset import AddGaussianNoise
 
 def set_seed(seed):
     """
@@ -195,7 +196,7 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
     return model
 
 
-def evaluate_model(model, data_loader, device):
+def evaluate_model(model, data_loader, device, test_noise=False):
     """
     Evaluates a trained model on a given dataset.
 
@@ -222,7 +223,13 @@ def evaluate_model(model, data_loader, device):
 
     accuracy_list = []
 
+    noise = AddGaussianNoise()
+
     for inputs, targets in data_loader:  # For every batch
+
+        # Add noise to data
+        if test_noise:
+            inputs = noise(inputs)
 
         # Send data to device
         inputs = inputs.to(device)
@@ -243,7 +250,7 @@ def evaluate_model(model, data_loader, device):
     return accuracy
 
 
-def main(lr, batch_size, epochs, data_dir, seed, augmentation_name):
+def main(lr, batch_size, epochs, data_dir, seed, augmentation_name, evaluate=False, resume=None, test_noise=False):
     """
     Main function for training and testing the model.
 
@@ -274,7 +281,10 @@ def main(lr, batch_size, epochs, data_dir, seed, augmentation_name):
     pass  # Given in the train_model() inputs
 
     # Train the model
-    model = train_model(model, lr, batch_size, epochs, data_dir, f'best_model_{time.time()}', device, augmentation_name)
+    if not evaluate:
+        model = train_model(model, lr, batch_size, epochs, data_dir, f'best_model_{time.time()}', device, augmentation_name)
+    else:
+        model.load_state_dict(torch.load(resume))
 
 
     # Evaluate the model on the test set
@@ -285,7 +295,7 @@ def main(lr, batch_size, epochs, data_dir, seed, augmentation_name):
 
     test_set = get_test_set(data_dir)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=2)
-    accuracy = evaluate_model(model, test_loader, device)
+    accuracy = evaluate_model(model, test_loader, device, test_noise)
 
     print(f'      - Accuracy: {round(accuracy * 100, 2)}%')
     print()
@@ -316,6 +326,12 @@ if __name__ == '__main__':
                         help='Data directory where to store/find the CIFAR100 dataset.')
     parser.add_argument('--augmentation_name', default=None, type=str,
                         help='Augmentation to use.')
+    parser.add_argument("--evaluate", default=False, action="store_true",
+                        help="evaluate model test set")
+    parser.add_argument("--resume", type=str, default=None,
+                        help="path to resume from checkpoint")
+    parser.add_argument("--test_noise", default=False, action="store_true",
+                        help="whether to add noise to the test images",)
 
     args = parser.parse_args()
     kwargs = vars(args)

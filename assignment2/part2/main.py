@@ -36,7 +36,7 @@ def parse_option():
     parser.add_argument(
         "--square_size",
         type=int,
-        default=8,
+        default=0,  # Changed so that by default the check is not applied
         help="size of each square in checkboard prompt",
     )
     # optimization

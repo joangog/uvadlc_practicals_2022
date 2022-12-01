@@ -225,7 +225,7 @@ def main():
         # That is, if a class in CIFAR100 corresponded to '4', it should now correspond to '14'
         # Set the result of this to the attribute cifar100_test.targets to override them
 
-        cifar100_test.targets = cifar100_test.targets + 10
+        cifar100_test.targets = [target + 10 for target in cifar100_test.targets]
 
         #######################
         # END OF YOUR CODE    #
@@ -255,9 +255,9 @@ def main():
         #######################
 
         # TODO: Compute the weighted average of the above two accuracies
-        cifar10_samples_percent = len(cifar10_loader) / len(cifar10_loader) + len(cifar100_loader)
-        cifar100_samples_percent = len(cifar100_loader) / len(cifar10_loader) + len(cifar100_loader)
-        accuracy_all = acc_cifar10 * cifar10_samples_percent + acc_cifar100 * cifar100_samples_percent
+        cifar10_samples_percent = len(cifar10_loader) / (len(cifar10_loader) + len(cifar100_loader))
+        cifar100_samples_percent = len(cifar100_loader) / (len(cifar10_loader) + len(cifar100_loader))
+        accuracy_all = round(acc_cifar10 * cifar10_samples_percent + acc_cifar100 * cifar100_samples_percent, 3)
 
         # Hint:
         # - accurary_all = acc_cifar10 * (% of cifar10 samples) \

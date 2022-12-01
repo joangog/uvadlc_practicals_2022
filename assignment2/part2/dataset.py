@@ -41,7 +41,7 @@ class AddGaussianNoise(torch.nn.Module):
         # - Finally, you can add the noise to the image.
 
         noise = self.std * torch.randn(img.shape) + self.mean
-        img = img + noise
+        return img + noise
 
         #######################
         # END OF YOUR CODE    #

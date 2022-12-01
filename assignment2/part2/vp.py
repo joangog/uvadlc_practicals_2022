@@ -44,6 +44,8 @@ class PadPrompter(nn.Module):
         # - Shape of self.pad_up and self.pad_down should be (1, 3, pad_size, image_size)
         # - See Fig 2.(g)/(h) and think about the shape of self.pad_left and self.pad_right
 
+        self.args = args
+
         self.pad_size = pad_size
         self.image_size = image_size
 
@@ -69,10 +71,31 @@ class PadPrompter(nn.Module):
 
         batch_size = x.shape[0]
 
-        x[:, :, self.pad_size:self.image_size-self.pad_size,:self.pad_size] = self.pad_left.repeat(batch_size, 1, 1, 1) # Repeats the padding for every image in the batch
-        x[:, :, self.pad_size:self.image_size-self.pad_size, self.image_size-self.pad_size:self.image_size] = self.pad_right.repeat(batch_size, 1, 1, 1)
-        x[:, :, :self.pad_size, :self.image_size] = self.pad_up.repeat(batch_size, 1, 1, 1)
-        x[:, :, self.image_size-self.pad_size:self.image_size, :self.image_size] = self.pad_down.repeat(batch_size, 1, 1, 1)
+        x_new = x.clone().to()
+
+        x_new[:, :, self.pad_size:self.image_size-self.pad_size,:self.pad_size] = self.pad_left.repeat(batch_size, 1, 1, 1) # Repeats the padding for every image in the batch
+        x_new[:, :, self.pad_size:self.image_size-self.pad_size, self.image_size-self.pad_size:self.image_size] = self.pad_right.repeat(batch_size, 1, 1, 1)
+        x_new[:, :, :self.pad_size, :self.image_size] = self.pad_up.repeat(batch_size, 1, 1, 1)
+        x_new[:, :, self.image_size-self.pad_size:self.image_size, :self.image_size] = self.pad_down.repeat(batch_size, 1, 1, 1)
+
+
+        # Apply checkerboard effect
+
+        h, w = x.shape[2], x.shape[3]  # Shape of checkerboard mask matrix
+        s = self.args.square_size  # Check size
+
+        if s != 0:  # If to apply checkerboard effect
+
+            # Create checkerboard mask of 1s and 0s
+            # Note: Method copied from https://stackoverflow.com/questions/72874737/how-to-make-a-checkerboard-in-pytorch
+            indices = torch.stack(torch.meshgrid(torch.arange(h//s), torch.arange(w//s))).to(x.device)
+            checkerboard = (indices.sum(dim=0) % 2).repeat_interleave(s, 0).repeat_interleave(s, 1)
+
+            # Multiplies the old x with the checkerboard mask and the new x with the inverted checkerboard max
+            x = x * checkerboard + (torch.abs(checkerboard-1)) * x_new
+
+        else:  # If not to apply then just return the padded x
+            x = x_new
 
         return x
 

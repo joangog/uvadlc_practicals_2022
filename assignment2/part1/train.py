@@ -130,11 +130,11 @@ def train_model(model, lr, batch_size, epochs, data_dir, checkpoint_name, device
     # Send model to device
     model.to(device)
 
-    model.train()
-
     for epoch in range(epochs):  # For every epoch
         print(f'Epoch {epoch}:')
         epoch_losses = []  # Loss for every batch in this epoch
+
+        model.train()
 
         for inputs, targets in tqdm(train_loader):  # For every batch
 

@@ -38,7 +38,25 @@ class CNNEncoder(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        raise NotImplementedError
+
+        c_hid = num_filters  # Number of hidden channels
+        gelu = nn.GELU
+
+        self.net = nn.Sequential(
+            nn.Conv2d(num_input_channels, c_hid, kernel_size=3, padding=1, stride=2),
+            gelu(),
+            nn.Conv2d(c_hid, c_hid, kernel_size=3, padding=1),
+            gelu(),
+            nn.Conv2d(c_hid, 2*c_hid, kernel_size=3, padding=1, stride=2),
+            gelu(),
+            nn.Conv2d(2*c_hid, 2*c_hid, kernel_size=3, padding=1),
+            gelu(),
+            nn.Conv2d(2*c_hid, 2*c_hid, kernel_size=3, padding=1, stride=2),
+            gelu(),
+            nn.Flatten(),
+            nn.Linear(2*16*c_hid, 2*z_dim)  # Output is two feature vectors, one for the mean and one for the sigma
+        )
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -56,9 +74,13 @@ class CNNEncoder(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        mean = None
-        log_std = None
-        raise NotImplementedError
+
+        p_z = self.net(x)  # Latent distribution
+
+        z_dim = int(p_z.shape[1]/2)
+        mean = p_z[:, :z_dim]
+        log_std = p_z[:, z_dim:]
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -84,7 +106,26 @@ class CNNDecoder(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        raise NotImplementedError
+
+        c_hid = num_filters
+        gelu = nn.GELU
+
+        self.linear = nn.Sequential(
+            nn.Linear(z_dim, 2*16*c_hid),
+            gelu()
+        )
+        self.net = nn.Sequential(
+            nn.ConvTranspose2d(2*c_hid, 2*c_hid, kernel_size=3, output_padding=0, padding=1, stride=2),
+            gelu(),
+            nn.Conv2d(2*c_hid, 2*c_hid, kernel_size=3, padding=1),
+            gelu(),
+            nn.ConvTranspose2d(2*c_hid, c_hid, kernel_size=3, output_padding=1, padding=1, stride=2),
+            gelu(),
+            nn.Conv2d(c_hid, c_hid, kernel_size=3, padding=1),
+            gelu(),
+            nn.ConvTranspose2d(c_hid, num_input_channels, kernel_size=3, output_padding=1, padding=1, stride=2)
+        )
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -102,8 +143,11 @@ class CNNDecoder(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        x = None
-        raise NotImplementedError
+
+        z = self.linear(z)
+        z = z.reshape(z.shape[0], -1, 4, 4)
+        x = self.net(z)
+
         #######################
         # END OF YOUR CODE    #
         #######################

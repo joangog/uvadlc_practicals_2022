@@ -70,13 +70,29 @@ class VAE(pl.LightningModule):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        L_rec = None
-        L_reg = None
-        bpd = None
-        raise NotImplementedError
+
+        # Encoder
+        mean, log_std = self.encoder(imgs)
+        std = torch.exp(log_std)
+
+        # Parametrization Trick
+        z = sample_reparameterize(mean, std)
+
+        # Decoder
+        p = self.decoder(z)
+
+        # Losses
+        L_rec = torch.nn.functional.cross_entropy(p, imgs.squeeze(), reduction='sum') / p.shape[0]  # Mean L_rec of the batch
+        L_reg = torch.sum(KLD(mean, log_std)) / mean.shape[0]  # Mean KLD of the batch
+
+        elbo = L_rec + L_reg
+
+        bpd = elbo_to_bpd(elbo, imgs.shape)
+
         #######################
         # END OF YOUR CODE    #
         #######################
+
         return L_rec, L_reg, bpd
 
     @torch.no_grad()
@@ -91,8 +107,25 @@ class VAE(pl.LightningModule):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        x_samples = None
-        raise NotImplementedError
+
+        # Sample z
+        z = torch.randn(batch_size, 2).to(self.device)
+
+        # Decoder
+        p_x = self.decoder(z)
+        p_x = torch.nn.functional.softmax(p_x, dim=1)  # Parameters for distribution p(x)
+
+        # Reshape distribution parameter tensor
+        p_x_dims = p_x.shape  # Distribution dimensions: B x P x N x N (P=param_count)
+        p_x_count = p_x_dims[0] * p_x_dims[2] * p_x_dims[3]  # Number of distributions
+        p_x_param_count = p_x_dims[1]  # Number of parameters of each distribution
+        p_x = p_x.permute(0, 2, 3, 1) \
+            .reshape(p_x_count, p_x_param_count)  # Change dimension order and flatten pixel and batch dimensions so that new shape: B*N*N x P
+
+        # Sample images from distribution p(x)
+        x_samples = torch.multinomial(p_x, 1)  # 1 sample per pixel
+        x_samples = x_samples.reshape(p_x_dims[0], 1, p_x_dims[2], p_x_dims[3])  # Reshape flattened image to B x C x N x N
+
         #######################
         # END OF YOUR CODE    #
         #######################

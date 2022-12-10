@@ -35,8 +35,16 @@ def sample_reparameterize(mean, std):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-    z = None
-    raise NotImplementedError
+
+    if mean.ndim == 1:
+        mean = torch.unsqueeze(mean, dim=0)
+
+    z_dim = mean.shape[1]
+
+    e = torch.randn(z_dim).to(mean.device)
+
+    z = mean + std * e
+
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -58,8 +66,9 @@ def KLD(mean, log_std):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-    KLD = None
-    raise NotImplementedError
+
+    KLD = (1/2) * torch.sum(torch.exp(2*log_std) + mean**2 - 1 - 2*log_std, axis=1)  # KLD per image
+
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -78,8 +87,9 @@ def elbo_to_bpd(elbo, img_shape):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-    bpd = None
-    raise NotImplementedError
+
+    bpd = elbo * np.log2(np.exp(1)) * 1 / np.prod(img_shape[1:])
+
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -110,8 +120,31 @@ def visualize_manifold(decoder, grid_size=20):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-    img_grid = None
-    raise NotImplementedError
+
+    p_z = torch.distributions.Normal(0, 1)  # Distribution for z
+
+    # Make z grid
+    z_vals = p_z.icdf(torch.arange(0.5/grid_size, 1, 1/grid_size))  # Values for z (dimensions x and y are flattened)
+    z_x, z_y = torch.meshgrid(z_vals, z_vals, indexing='ij')  # Make points z by making a grid of the values in z_vals
+    z = torch.dstack([z_x, z_y]).reshape(grid_size**2, 2)
+
+    # Decoder
+    p_x = decoder(z)
+    p_x = torch.nn.functional.softmax(p_x, dim=1)  # Parameters for distribution p(x)
+
+    # Reshape distribution parameter tensor
+    p_x_dims = p_x.shape  # Distribution dimensions: B x P x N x N (P=param_count)
+    p_x_count = p_x_dims[0] * p_x_dims[2] * p_x_dims[3]  # Number of distributions
+    p_x_param_count = p_x_dims[1]  # Number of parameters of each distribution
+    p_x = p_x.permute(0, 2, 3, 1) \
+        .reshape(p_x_count, p_x_param_count)  # Change dimension order and flatten pixel and batch dimensions so that new shape: B*N*N x P
+
+    # Sample images from distribution p(x)
+    x = torch.multinomial(p_x, 1)  # 1 sample per pixel
+    imgs = x.reshape(p_x_dims[0], 1, p_x_dims[2], p_x_dims[3])  # Reshape flattened image to B x C x N x N
+
+    img_grid = make_grid(imgs, grid_size).float()
+
     #######################
     # END OF YOUR CODE    #
     #######################

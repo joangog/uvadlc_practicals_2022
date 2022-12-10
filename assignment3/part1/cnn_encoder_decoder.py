@@ -39,6 +39,8 @@ class CNNEncoder(nn.Module):
         # PUT YOUR CODE HERE  #
         #######################
 
+        self.z_dim = z_dim  # Save for later use
+
         c_hid = num_filters  # Number of hidden channels
         gelu = nn.GELU
 
@@ -77,9 +79,8 @@ class CNNEncoder(nn.Module):
 
         p_z = self.net(x)  # Latent distribution
 
-        z_dim = int(p_z.shape[1]/2)
-        mean = p_z[:, :z_dim]
-        log_std = p_z[:, z_dim:]
+        mean = p_z[:, :self.z_dim]
+        log_std = p_z[:, self.z_dim:]
 
         #######################
         # END OF YOUR CODE    #
@@ -106,6 +107,8 @@ class CNNDecoder(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+
+        self.z_dim = z_dim  # Save for later use
 
         c_hid = num_filters
         gelu = nn.GELU

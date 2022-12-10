@@ -109,7 +109,8 @@ class VAE(pl.LightningModule):
         #######################
 
         # Sample z
-        z = torch.randn(batch_size, 2).to(self.device)
+        z_dim = self.encoder.z_dim
+        z = torch.randn(batch_size, z_dim).to(self.device)
 
         # Decoder
         p_x = self.decoder(z)

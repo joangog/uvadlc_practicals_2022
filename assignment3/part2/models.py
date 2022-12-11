@@ -34,7 +34,28 @@ class ConvEncoder(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        raise NotImplementedError
+
+        self.z_dim = z_dim  # Save for later use
+
+        c_in = 1  # Number of input channels
+        c_hid = 32  # Number of hidden channels
+        relu = nn.RELU
+
+        self.net = nn.Sequential(
+            nn.Conv2d(c_in, c_hid, kernel_size=3, padding=1, stride=2),
+            relu(),
+            nn.Conv2d(c_hid, c_hid, kernel_size=3, padding=1),
+            relu(),
+            nn.Conv2d(c_hid, 2 * c_hid, kernel_size=3, padding=1, stride=2),
+            relu(),
+            nn.Conv2d(2 * c_hid, 2 * c_hid, kernel_size=3, padding=1),
+            relu(),
+            nn.Conv2d(2 * c_hid, 2 * c_hid, kernel_size=3, padding=1, stride=2),
+            relu(),
+            nn.Flatten(),
+            nn.Linear(2 * 16 * c_hid, 2 * z_dim)  # Output is two feature vectors, one for the mean and one for the sigma
+        )
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -49,8 +70,16 @@ class ConvEncoder(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        x = None
-        raise NotImplementedError
+
+        p_z = self.net(x)  # Latent distribution
+
+        mean = p_z[:, :self.z_dim]
+        log_std = p_z[:, self.z_dim:]
+        std = torch.exp(log_std)
+
+        e = torch.randn(self.z_dim).to(mean.device)
+        z = mean + std * e
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -80,7 +109,29 @@ class ConvDecoder(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        raise NotImplementedError
+
+        self.z_dim = z_dim  # Save for later use
+
+        c_in = 1  # Number of input channels
+        c_hid = 32  # Number of hidden channels
+        relu = nn.RELU
+
+        self.linear = nn.Sequential(
+            nn.Linear(z_dim, 2*16*c_hid),
+            relu()
+        )
+        self.net = nn.Sequential(
+            nn.ConvTranspose2d(2*c_hid, 2*c_hid, kernel_size=3, output_padding=0, padding=1, stride=2),
+            relu(),
+            nn.Conv2d(2*c_hid, 2*c_hid, kernel_size=3, padding=1),
+            relu(),
+            nn.ConvTranspose2d(2*c_hid, c_hid, kernel_size=3, output_padding=1, padding=1, stride=2),
+            relu(),
+            nn.Conv2d(c_hid, c_hid, kernel_size=3, padding=1),
+            relu(),
+            nn.ConvTranspose2d(c_hid, c_in, kernel_size=3, output_padding=1, padding=1, stride=2)
+        )
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -95,8 +146,11 @@ class ConvDecoder(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        recon_x = None
-        raise NotImplementedError
+
+        z = self.linear(z)
+        z = z.reshape(z.shape[0], -1, 4, 4)
+        recon_x = self.net(z)
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -117,7 +171,21 @@ class Discriminator(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        raise NotImplementedError
+
+        self.z_dim = z_dim  # Save for later use
+
+        c_in = 1  # Number of input channels
+        c_hid = 32  # Number of hidden channels
+        lrelu = nn.LeakyReLU(negative_slope=0.2)
+
+        self.net = nn.Sequential(
+            nn.Linear(z_dim, 512),
+            lrelu(),
+            nn.Linear(512, 512),
+            lrelu(),
+            nn.Linear(512, 2 * z_dim),  # No activation (?)
+        )
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -133,8 +201,9 @@ class Discriminator(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        preds = None
-        raise NotImplementedError
+
+        preds = self.net(z)
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -151,7 +220,7 @@ class Discriminator(nn.Module):
 class AdversarialAE(nn.Module):
     def __init__(self, z_dim=8):
         """
-        Adversarial Autoencoder network with a Encoder, Decoder and Discriminator.
+        Adversarial Autoencoder network with an Encoder, Decoder and Discriminator.
         Inputs:
               z_dim - Dimensionality of the latent code space. This is the number of neurons of the code layer
         """
@@ -172,9 +241,10 @@ class AdversarialAE(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        recon_x_ = None
-        z = None
-        raise NotImplementedError
+
+        z = self.encoder(x)
+        recon_x = self.decoder(z)
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -197,11 +267,16 @@ class AdversarialAE(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        ae_loss = None
-        logging_dict = {"gen_loss": None,
-                        "recon_loss": None,
-                        "ae_loss": None}
-        raise NotImplementedError
+
+        gen_loss = F.binary_cross_entropy_with_logits(z_fake, torch.ones(z_fake.shape[0]))  # The targets for the fake data must be 1 ('real') because the Generator wants to trick the Discriminator
+        recon_loss = F.mse_loss(recon_x, x, reduction='mean')
+
+        ae_loss = lambda_ * recon_loss + (1 - lambda_) * gen_loss
+
+        logging_dict = {"gen_loss": gen_loss,
+                        "recon_loss": recon_loss,
+                        "ae_loss": ae_loss}
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -223,12 +298,20 @@ class AdversarialAE(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        disc_loss = None
-        logging_dict = {"disc_loss": None,
-                        "loss_real": None,
-                        "loss_fake": None,
+
+        # i dont think loss_real is right (?) maybe i need to sample the real data from the prior
+        loss_real = F.binary_cross_entropy_with_logits(1 - z_fake, torch.ones(z_fake.shape[0]))
+        loss_fake = F.binary_cross_entropy_with_logits(z_fake, torch.zeros(z_fake.shape[0]))
+
+        disc_loss = loss_real + loss_fake
+
+        # need to implement accuracy here (how ?)
+
+        logging_dict = {"disc_loss": disc_loss,
+                        "loss_real": loss_real,
+                        "loss_fake": loss_fake,
                         "accuracy": None}
-        raise NotImplementedError
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -247,8 +330,26 @@ class AdversarialAE(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        x = None
-        raise NotImplementedError
+
+        # Sample z
+        z_dim = self.encoder.z_dim
+        z = torch.randn(batch_size, z_dim).to(self.device)
+
+        # Decoder
+        p = self.decoder(z)
+        p = torch.nn.functional.softmax(p, dim=1)  # Parameters for distribution p(x)
+
+        # Reshape distribution parameter tensor
+        p_dims = p.shape  # Distribution dimensions: B x P x N x N (P=param_count)
+        p_count = p_dims[0] * p_dims[2] * p_dims[3]  # Number of distributions
+        p_param_count = p_dims[1]  # Number of parameters of each distribution
+        p = p.permute(0, 2, 3, 1) \
+            .reshape(p_count, p_param_count)  # Change dimension order and flatten pixel and batch dimensions so that new shape: B*N*N x P
+
+        # Sample images from distribution p(x|z)
+        x = torch.multinomial(p, 1)  # 1 sample per pixel
+        x = x.reshape(p_dims[0], 1, p_dims[2], p_dims[3])  # Reshape flattened image to B x C x N x N
+
         #######################
         # END OF YOUR CODE    #
         #######################

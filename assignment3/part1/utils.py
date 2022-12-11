@@ -129,19 +129,19 @@ def visualize_manifold(decoder, grid_size=20):
     z = torch.dstack([z_x, z_y]).reshape(grid_size**2, 2)
 
     # Decoder
-    p_x = decoder(z)
-    p_x = torch.nn.functional.softmax(p_x, dim=1)  # Parameters for distribution p(x)
+    p = decoder(z)
+    p = torch.nn.functional.softmax(p, dim=1)  # Parameters for distribution p(x|z)
 
     # Reshape distribution parameter tensor
-    p_x_dims = p_x.shape  # Distribution dimensions: B x P x N x N (P=param_count)
-    p_x_count = p_x_dims[0] * p_x_dims[2] * p_x_dims[3]  # Number of distributions
-    p_x_param_count = p_x_dims[1]  # Number of parameters of each distribution
-    p_x = p_x.permute(0, 2, 3, 1) \
-        .reshape(p_x_count, p_x_param_count)  # Change dimension order and flatten pixel and batch dimensions so that new shape: B*N*N x P
+    p_dims = p.shape  # Distribution dimensions: B x P x N x N (P=param_count)
+    p_count = p_dims[0] * p_dims[2] * p_dims[3]  # Number of distributions
+    p_param_count = p_dims[1]  # Number of parameters of each distribution
+    p = p.permute(0, 2, 3, 1) \
+        .reshape(p_count, p_param_count)  # Change dimension order and flatten pixel and batch dimensions so that new shape: B*N*N x P
 
-    # Sample images from distribution p(x)
-    x = torch.multinomial(p_x, 1)  # 1 sample per pixel
-    imgs = x.reshape(p_x_dims[0], 1, p_x_dims[2], p_x_dims[3])  # Reshape flattened image to B x C x N x N
+    # Sample images from distribution p(x|z)
+    x = torch.multinomial(p, 1)  # 1 sample per pixel
+    imgs = x.reshape(p_dims[0], 1, p_dims[2], p_dims[3])  # Reshape flattened image to B x C x N x N
 
     img_grid = make_grid(imgs, grid_size).float()
 

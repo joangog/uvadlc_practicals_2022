@@ -39,7 +39,7 @@ class ConvEncoder(nn.Module):
 
         c_in = 1  # Number of input channels
         c_hid = 32  # Number of hidden channels
-        relu = nn.RELU
+        relu = nn.ReLU
 
         self.net = nn.Sequential(
             nn.Conv2d(c_in, c_hid, kernel_size=3, padding=1, stride=2),
@@ -53,7 +53,7 @@ class ConvEncoder(nn.Module):
             nn.Conv2d(2 * c_hid, 2 * c_hid, kernel_size=3, padding=1, stride=2),
             relu(),
             nn.Flatten(),
-            nn.Linear(2 * 16 * c_hid, 2 * z_dim)  # Output is two feature vectors, one for the mean and one for the sigma
+            nn.Linear(2 * 16 * c_hid, z_dim)  # Output is two feature vectors, one for the mean and one for the sigma
         )
 
         #######################
@@ -71,14 +71,7 @@ class ConvEncoder(nn.Module):
         # PUT YOUR CODE HERE  #
         #######################
 
-        p_z = self.net(x)  # Latent distribution
-
-        mean = p_z[:, :self.z_dim]
-        log_std = p_z[:, self.z_dim:]
-        std = torch.exp(log_std)
-
-        e = torch.randn(self.z_dim).to(mean.device)
-        z = mean + std * e
+        z = self.net(x)
 
         #######################
         # END OF YOUR CODE    #
@@ -114,7 +107,7 @@ class ConvDecoder(nn.Module):
 
         c_in = 1  # Number of input channels
         c_hid = 32  # Number of hidden channels
-        relu = nn.RELU
+        relu = nn.ReLU
 
         self.linear = nn.Sequential(
             nn.Linear(z_dim, 2*16*c_hid),
@@ -129,7 +122,8 @@ class ConvDecoder(nn.Module):
             relu(),
             nn.Conv2d(c_hid, c_hid, kernel_size=3, padding=1),
             relu(),
-            nn.ConvTranspose2d(c_hid, c_in, kernel_size=3, output_padding=1, padding=1, stride=2)
+            nn.ConvTranspose2d(c_hid, c_in, kernel_size=3, output_padding=1, padding=1, stride=2),
+            nn.Tanh()  # The input images is scaled between -1 and 1, hence the output has to be bounded as well
         )
 
         #######################
@@ -180,9 +174,9 @@ class Discriminator(nn.Module):
 
         self.net = nn.Sequential(
             nn.Linear(z_dim, 512),
-            lrelu(),
+            lrelu,
             nn.Linear(512, 512),
-            lrelu(),
+            lrelu,
             nn.Linear(512, 2 * z_dim),  # No activation (?)
         )
 
@@ -268,7 +262,9 @@ class AdversarialAE(nn.Module):
         # PUT YOUR CODE HERE  #
         #######################
 
-        gen_loss = F.binary_cross_entropy_with_logits(z_fake, torch.ones(z_fake.shape[0]))  # The targets for the fake data must be 1 ('real') because the Generator wants to trick the Discriminator
+        preds = self.discriminator(z_fake)
+        targets = torch.ones_like(preds)
+        gen_loss = F.binary_cross_entropy_with_logits(preds, targets)  # The targets for the fake data must be 1 ('real') because the Generator wants to trick the Discriminator
         recon_loss = F.mse_loss(recon_x, x, reduction='mean')
 
         ae_loss = lambda_ * recon_loss + (1 - lambda_) * gen_loss
@@ -299,18 +295,27 @@ class AdversarialAE(nn.Module):
         # PUT YOUR CODE HERE  #
         #######################
 
-        # i dont think loss_real is right (?) maybe i need to sample the real data from the prior
-        loss_real = F.binary_cross_entropy_with_logits(1 - z_fake, torch.ones(z_fake.shape[0]))
-        loss_fake = F.binary_cross_entropy_with_logits(z_fake, torch.zeros(z_fake.shape[0]))
+        # Real data
+        z_real = torch.rand_like(z_fake)
+        preds_real = self.discriminator(z_real)
+        targets_real = torch.ones_like(preds_real)
+        loss_real = F.binary_cross_entropy_with_logits(preds_real, targets_real)
 
+        # Fake data
+        preds_fake = self.discriminator(z_fake)
+        targets_fake = torch.zeros_like(preds_fake)
+        loss_fake = F.binary_cross_entropy_with_logits(preds_fake, targets_fake)
+
+        # Combined data
+        targets = torch.vstack((targets_real, targets_fake))
+        preds = torch.vstack((preds_real, preds_fake))
         disc_loss = loss_real + loss_fake
-
-        # need to implement accuracy here (how ?)
+        accuracy = torch.sum(preds == targets) / targets.shape[0]
 
         logging_dict = {"disc_loss": disc_loss,
                         "loss_real": loss_real,
                         "loss_fake": loss_fake,
-                        "accuracy": None}
+                        "accuracy": accuracy}
 
         #######################
         # END OF YOUR CODE    #
@@ -336,19 +341,7 @@ class AdversarialAE(nn.Module):
         z = torch.randn(batch_size, z_dim).to(self.device)
 
         # Decoder
-        p = self.decoder(z)
-        p = torch.nn.functional.softmax(p, dim=1)  # Parameters for distribution p(x)
-
-        # Reshape distribution parameter tensor
-        p_dims = p.shape  # Distribution dimensions: B x P x N x N (P=param_count)
-        p_count = p_dims[0] * p_dims[2] * p_dims[3]  # Number of distributions
-        p_param_count = p_dims[1]  # Number of parameters of each distribution
-        p = p.permute(0, 2, 3, 1) \
-            .reshape(p_count, p_param_count)  # Change dimension order and flatten pixel and batch dimensions so that new shape: B*N*N x P
-
-        # Sample images from distribution p(x|z)
-        x = torch.multinomial(p, 1)  # 1 sample per pixel
-        x = x.reshape(p_dims[0], 1, p_dims[2], p_dims[3])  # Reshape flattened image to B x C x N x N
+        x = self.decoder(z)
 
         #######################
         # END OF YOUR CODE    #

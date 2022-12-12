@@ -43,7 +43,7 @@ def generate_and_save(model, epoch, summary_writer, batch_size=64):
         batch_size - Number of images to generate/sample
     """
     samples = model.sample(batch_size)
-    grid = make_grid(samples, nrow=8, normalize=True,
+    grid = make_grid(samples.float(), nrow=8, normalize=True,
                      value_range=(-1, 1), pad_value=0.5)
     grid = grid.detach().cpu()
     summary_writer.add_image("samples", grid, global_step=epoch)
@@ -103,8 +103,8 @@ def train_aae(epoch, model, train_loader,
 
         # Encoder-Decoder update
         recon_x, z = model.forward(x)
-        ae_loss = model.get_loss_autoencoder(x, recon_x, z, lambda_=1)
-        ae_loss.backward()
+        ae_loss, _ = model.get_loss_autoencoder(x, recon_x, z, lambda_=1)
+        ae_loss.backward(retain_graph=True)
         optimizer_ae.step()
 
         #######################
@@ -116,7 +116,7 @@ def train_aae(epoch, model, train_loader,
         #######################
 
         # Discriminator update
-        disc_loss = model.get_loss_discriminator(z)
+        disc_loss, _ = model.get_loss_discriminator(z.detach())
         disc_loss.backward()
         optimizer_disc.step()
 
@@ -181,8 +181,10 @@ def main(args):
 
     # You can use the Adam optimizer for autoencoder and SGD for discriminator.
     # It is recommended to reduce the momentum (beta1) to e.g. 0.5 for Adam optimizer.
-    optimizer_ae = optim.Adam(lr=args.ae_lr, beta1=0.5)
-    optimizer_disc = optim.SGD(lr=args.d_lr)
+    ae_params = [param for param in model.encoder.parameters()] + [param for param in model.decoder.parameters()]
+    disc_params = model.discriminator.parameters()
+    optimizer_ae = optim.Adam(ae_params, lr=args.ae_lr, betas=[0.5, 0.999])
+    optimizer_disc = optim.SGD(disc_params, lr=args.d_lr)
 
     #######################
     # END OF YOUR CODE    #

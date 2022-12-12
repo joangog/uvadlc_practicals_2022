@@ -145,6 +145,17 @@ def visualize_manifold(decoder, grid_size=20):
 
     img_grid = make_grid(imgs, grid_size).float()
 
+    G = torch.distributions.Normal(0, 1)
+    start, end = 0.5 / grid_size, (grid_size - 0.5) / grid_size
+    # NOTE this gives percentiles spaced by 1/grid_size in the original space,
+    # not in the latent one!
+    axis = G.icdf(torch.Tensor(np.linspace(start, end, num=grid_size)))
+    coords = torch.dstack(torch.meshgrid(axis, axis, indexing="ij"))
+    pixel_probs = torch.nn.functional.softmax(decoder(coords.view(-1, 2)), dim=1)
+    batch_s, n_classes, w, h = pixel_probs.shape
+    pixel_probs = pixel_probs.permute(0, 2, 3, 1).reshape(-1, n_classes)
+    chosen_pixel_vals = torch.multinomial(pixel_probs, 1).view(batch_s, 1, w, h).float()
+
     #######################
     # END OF YOUR CODE    #
     #######################

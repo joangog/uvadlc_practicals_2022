@@ -263,7 +263,7 @@ class AdversarialAE(nn.Module):
         #######################
 
         preds = self.discriminator(z_fake)
-        targets = torch.ones_like(preds)
+        targets = torch.zeros_like(preds)
         gen_loss = F.binary_cross_entropy_with_logits(preds, targets)
         recon_loss = F.mse_loss(recon_x, x, reduction='mean')
 

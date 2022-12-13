@@ -177,7 +177,7 @@ class Discriminator(nn.Module):
             lrelu,
             nn.Linear(512, 512),
             lrelu,
-            nn.Linear(512, 2 * z_dim),  # No activation (?)
+            nn.Linear(512, 1),  # No activation (?)
         )
 
         #######################
@@ -263,8 +263,8 @@ class AdversarialAE(nn.Module):
         #######################
 
         preds = self.discriminator(z_fake)
-        targets = torch.ones_like(preds)
-        gen_loss = F.binary_cross_entropy_with_logits(preds, targets)  # The targets for the fake data must be 1 ('real') because the Generator wants to trick the Discriminator
+        targets = torch.zeros_like(preds)
+        gen_loss = F.binary_cross_entropy_with_logits(preds, targets)
         recon_loss = F.mse_loss(recon_x, x, reduction='mean')
 
         ae_loss = lambda_ * recon_loss + (1 - lambda_) * gen_loss
@@ -310,7 +310,7 @@ class AdversarialAE(nn.Module):
         targets = torch.vstack((targets_real, targets_fake))
         preds = torch.vstack((preds_real, preds_fake))
         disc_loss = loss_real + loss_fake
-        accuracy = torch.sum(preds == targets) / targets.shape[0]
+        accuracy = torch.sum((preds>0) == (targets>0)) / targets.shape[0]
 
         logging_dict = {"disc_loss": disc_loss,
                         "loss_real": loss_real,

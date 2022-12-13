@@ -94,6 +94,8 @@ def train_aae(epoch, model, train_loader,
     """
     assert 0 <= lambda_ <= 1, "Lambda should be between 0 and 1. "
     model.train()
+    total_disc_loss = 0  # My code
+    total_ae_loss = 0  # My code
     train_loss = 0
     for batch_idx, (x, _) in enumerate(train_loader):
         x = x.to(model.device)
@@ -103,7 +105,7 @@ def train_aae(epoch, model, train_loader,
 
         # Encoder-Decoder update
         recon_x, z = model.forward(x)
-        ae_loss, _ = model.get_loss_autoencoder(x, recon_x, z, lambda_=1)
+        ae_loss, _ = model.get_loss_autoencoder(x, recon_x, z, lambda_)
         ae_loss.backward(retain_graph=True)
         optimizer_ae.step()
 
@@ -116,7 +118,7 @@ def train_aae(epoch, model, train_loader,
         #######################
 
         # Discriminator update
-        disc_loss, _ = model.get_loss_discriminator(z.detach())
+        disc_loss, disc_logging = model.get_loss_discriminator(z.detach())
         disc_loss.backward()
         optimizer_disc.step()
 
@@ -126,11 +128,15 @@ def train_aae(epoch, model, train_loader,
         # END OF YOUR CODE    #
         #######################
 
+        total_disc_loss += disc_loss.item()  # My code
+        total_ae_loss += ae_loss.item()  # My code
         train_loss += disc_loss.item() + ae_loss.item()
 
         if (epoch <= 1 or epoch % 5 == 0) and batch_idx == 0:
             save_reconstruction(model, epoch, logger_ae.summary_writer, x)
     print('====> Epoch {} : Average loss: {:.4f}'.format(epoch, train_loss / len(train_loader)))
+    print('                 Average disc_loss: {:.4f}'.format(total_disc_loss / len(train_loader)))  # My code
+    print('                 Average ae_loss: {:.4f}'.format(total_ae_loss / len(train_loader)))  # My code
 
 
 def main(args):

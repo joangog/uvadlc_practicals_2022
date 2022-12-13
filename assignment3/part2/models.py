@@ -177,7 +177,7 @@ class Discriminator(nn.Module):
             lrelu,
             nn.Linear(512, 512),
             lrelu,
-            nn.Linear(512, 1),  # No activation (?)
+            nn.Linear(512, 1),
         )
 
         #######################
@@ -263,7 +263,7 @@ class AdversarialAE(nn.Module):
         #######################
 
         preds = self.discriminator(z_fake)
-        targets = torch.zeros_like(preds)
+        targets = torch.ones_like(preds)
         gen_loss = F.binary_cross_entropy_with_logits(preds, targets)
         recon_loss = F.mse_loss(recon_x, x, reduction='mean')
 
